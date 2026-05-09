@@ -1,0 +1,121 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "buyer", "finance"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Vendor information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "userId": { "type": "string" },
+        "nif": { "type": "string" },
+        "rc": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "bankInfo": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Product catalog item",
+      "type": "object",
+      "properties": {
+        "sku": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "defaultPrice": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "sku"]
+    },
+    "PurchaseOrder": {
+      "title": "Purchase Order",
+      "description": "Formal order document",
+      "type": "object",
+      "properties": {
+        "poNumber": { "type": "string" },
+        "userId": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "sent", "confirmed", "partially_delivered", "delivered", "closed"] },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "currency": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["poNumber", "supplierId", "status", "totalAmount"]
+    },
+    "DeliveryNote": {
+      "title": "Delivery Note",
+      "description": "Bon de Livraison records",
+      "type": "object",
+      "properties": {
+        "dnNumber": { "type": "string" },
+        "poId": { "type": "string" },
+        "date": { "type": "string" },
+        "items": { "type": "array" },
+        "receivedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["dnNumber", "poId", "date", "items"]
+    },
+    "StatusHistory": {
+      "title": "Status History",
+      "description": "Audit trail for status changes",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string" },
+        "userName": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["status", "userId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Vendor directory"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Items catalog"
+    },
+    "/purchase_orders/{poId}": {
+      "schema": "PurchaseOrder",
+      "description": "Orders"
+    },
+    "/purchase_orders/{poId}/deliveries/{dnId}": {
+      "schema": "DeliveryNote",
+      "description": "Logistics receipts"
+    },
+    "/purchase_orders/{poId}/status_history/{historyId}": {
+      "schema": "StatusHistory",
+      "description": "Audit trail entries"
+    }
+  }
+}

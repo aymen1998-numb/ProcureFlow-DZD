@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function getUserData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function role() { return getUserData().role; }
+    function getTenantId() { return getUserData().get('tenantId', request.auth.uid); }
+    function isAdmin() { return isSignedIn() && role() == 'admin'; }
+    function isBuyer() { return isSignedIn() && role() == 'buyer'; }
+    function isFinance() { return isSignedIn() && role() == 'finance'; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // --- Rules ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId());
+      allow list: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().uid == userId;
+      allow update: if (isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId())) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'email', 'createdAt', 'tenantId']);
+    }
+
+    match /suppliers/{supplierId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+    }
+
+    match /products/{productId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+    }
+
+    match /purchase_orders/{poId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+
+      match /deliveries/{dnId} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+        allow write: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+      }
+
+      match /status_history/{historyId} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+        allow write: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+      }
+
+      match /invoices/{invoiceId} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+        allow write: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+      }
+    }
+  }
+}
