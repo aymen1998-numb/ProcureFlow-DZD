@@ -21,6 +21,11 @@ service cloud.firestore {
 
     // --- Rules ---
 
+    match /tenant_settings/{tenant} {
+      allow read: if isSignedIn() && tenant == getTenantId();
+      allow write: if isSignedIn() && tenant == getTenantId() && isAdmin();
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId());
       allow list: if isSignedIn() && existing().tenantId == getTenantId();

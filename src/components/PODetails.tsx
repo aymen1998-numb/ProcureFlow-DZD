@@ -6,7 +6,7 @@ import {
 } from 'firebase/firestore';
 import { 
   ChevronLeft, FileText, Truck, Receipt, Plus, Trash2, Clock, CheckCircle2,
-  ChevronDown, ChevronUp, Calendar, Package, History, FileSpreadsheet, Download, User, Building2, Loader2, X
+  ChevronDown, ChevronUp, Calendar, Package, History, FileSpreadsheet, Download, User, Building2, Loader2, X, CheckCircle, XCircle, Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
@@ -29,6 +29,7 @@ export default function PODetails() {
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [invoiceNumberInput, setInvoiceNumberInput] = useState('');
   const [loading, setLoading] = useState(true);
+  const [companySettings, setCompanySettings] = useState<any>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,6 +40,12 @@ export default function PODetails() {
         const data = snap.data();
         setPo({ id: snap.id, ...data });
         
+        if (data.tenantId) {
+          getDoc(doc(db, 'tenant_settings', data.tenantId)).then(tsSnap => {
+            if (tsSnap.exists()) setCompanySettings(tsSnap.data());
+          });
+        }
+
         // Fetch supplier details if po has supplierId or we search by name
         if (data.supplierId) {
           getDoc(doc(db, 'suppliers', data.supplierId)).then(sSnap => {
@@ -214,6 +221,16 @@ export default function PODetails() {
       doc.setTextColor(30, 58, 95); // #1E3A5F
       doc.text("BON DE COMMANDE", 14, 25);
       
+      if (companySettings) {
+        doc.setFontSize(12);
+        doc.setTextColor(30, 58, 95);
+        doc.text(companySettings.companyName || '', 140, 25);
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139);
+        doc.text(companySettings.address || '', 140, 32);
+        doc.text(`NIF/RC: ${companySettings.taxId || '-'}`, 140, 39);
+      }
+      
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139); // slate-500
       doc.text(`BC N° : ${po.poNumber}`, 14, 35);
@@ -260,6 +277,16 @@ export default function PODetails() {
       doc.setTextColor(30, 58, 95);
       doc.text("BON DE LIVRAISON", 14, 25);
       
+      if (companySettings) {
+        doc.setFontSize(12);
+        doc.setTextColor(30, 58, 95);
+        doc.text(companySettings.companyName || '', 140, 25);
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139);
+        doc.text(companySettings.address || '', 140, 32);
+        doc.text(`NIF/RC: ${companySettings.taxId || '-'}`, 140, 39);
+      }
+
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
       doc.text(`BL N° : ${del.dnNumber}`, 14, 35);
@@ -308,6 +335,16 @@ export default function PODetails() {
       doc.setTextColor(30, 58, 95);
       doc.text("FACTURE", 14, 25);
       
+      if (companySettings) {
+        doc.setFontSize(12);
+        doc.setTextColor(30, 58, 95);
+        doc.text(companySettings.companyName || '', 140, 25);
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139);
+        doc.text(companySettings.address || '', 140, 32);
+        doc.text(`NIF/RC: ${companySettings.taxId || '-'}`, 140, 39);
+      }
+
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
       doc.text(`Facture N° : ${inv.invNumber}`, 14, 35);
@@ -431,14 +468,14 @@ export default function PODetails() {
             <Trash2 size={14} /> Supprimer
           </button>
           <div className="h-4 w-px bg-gray-200"></div>
-          <div className="flex gap-2">
-            {['draft', 'sent', 'confirmed', 'delivered', 'closed'].map(s => (
+          <div className="flex gap-2 flex-wrap justify-end">
+            {['draft', 'pending_approval', 'approved', 'sent', 'confirmed', 'delivered', 'closed'].map(s => (
             <button 
               key={s} 
               onClick={() => updateStatus(s)} 
               className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${po.status === s ? 'bg-[#1E3A5F] text-white border-[#1E3A5F] shadow-md' : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'}`}
             >
-              {s === 'draft' ? 'Brouillon' : s === 'sent' ? 'Envoyé' : s === 'confirmed' ? 'Confirmé' : s === 'delivered' ? 'Livré' : 'Clôturé'}
+              {s === 'draft' ? 'Brouillon' : s === 'pending_approval' ? 'En Attente' : s === 'approved' ? 'Approuvé' : s === 'sent' ? 'Envoyé' : s === 'confirmed' ? 'Confirmé' : s === 'delivered' ? 'Livré' : 'Clôturé'}
             </button>
           ))}
           </div>
@@ -494,16 +531,45 @@ export default function PODetails() {
               </table>
             </div>
             
-            <div className="mt-12 pt-10 border-t grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button onClick={exportPDF} className="py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-black transition-all">
+            <div className="mt-12 pt-10 border-t flex flex-wrap gap-4">
+              <button onClick={exportPDF} className="py-4 px-6 flex-1 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-black transition-all">
                 <Download size={18} /> Télécharger (PDF)
               </button>
-              <button onClick={openDeliveryModal} className="py-4 bg-[#3B82F6] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-100">
-                <Truck size={18} /> Enregistrer BL
-              </button>
-              <button onClick={openInvoiceModal} className="py-4 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-slate-900 transition-all shadow-lg shadow-slate-100">
-                <Receipt size={18} /> Enregistrer Facture
-              </button>
+              
+              {po.status === 'draft' && (
+                <button onClick={() => updateStatus('pending_approval')} className="py-4 px-6 flex-1 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-amber-600 transition-all shadow-lg shadow-amber-100">
+                  <CheckCircle size={18} /> Demander Approbation
+                </button>
+              )}
+
+              {po.status === 'pending_approval' && role === 'admin' && (
+                <>
+                  <button onClick={() => updateStatus('approved')} className="py-4 px-6 flex-1 bg-green-500 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg shadow-green-100">
+                    <CheckCircle size={18} /> Approuver
+                  </button>
+                  <button onClick={() => updateStatus('draft')} className="py-4 px-6 flex-1 bg-red-500 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-red-600 transition-all shadow-lg shadow-red-100">
+                    <XCircle size={18} /> Rejeter
+                  </button>
+                </>
+              )}
+
+              {po.status === 'approved' && (
+                <button onClick={() => updateStatus('sent')} className="py-4 px-6 flex-1 bg-blue-500 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-100">
+                  <Send size={18} /> Envoyer au Fournisseur
+                </button>
+              )}
+              
+              {(po.status === 'sent' || po.status === 'approved' || po.status === 'delivered') && (
+                <button onClick={openDeliveryModal} className="py-4 px-6 flex-1 bg-[#3B82F6] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-100">
+                  <Truck size={18} /> Enregistrer BL
+                </button>
+              )}
+              
+              {(po.status === 'delivered' || po.status === 'sent') && (
+                <button onClick={openInvoiceModal} className="py-4 px-6 flex-1 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-slate-900 transition-all shadow-lg shadow-slate-100">
+                  <Receipt size={18} /> Enregistrer Facture
+                </button>
+              )}
             </div>
           </section>
 

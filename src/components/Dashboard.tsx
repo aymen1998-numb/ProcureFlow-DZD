@@ -21,7 +21,8 @@ import {
   FileSpreadsheet,
   AlertTriangle,
   Menu,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -33,6 +34,7 @@ import Suppliers from './Suppliers';
 import Products from './Products';
 import UsersComponent from './Users';
 import ActivityLog from './ActivityLog';
+import Analytics from './Analytics';
 
 interface PO {
   id: string;
@@ -45,9 +47,11 @@ interface PO {
   buyerName: string;
 }
 
+import SettingsComponent from './Settings';
+
 export default function Dashboard() {
   const { user, role, tenantId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'suppliers' | 'products' | 'analytics' | 'history' | 'users'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'suppliers' | 'products' | 'analytics' | 'history' | 'users' | 'settings'>('dashboard');
   const [pos, setPos] = useState<PO[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +92,8 @@ export default function Dashboard() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'draft': return 'Brouillon';
+      case 'pending_approval': return 'En Attente';
+      case 'approved': return 'Approuvé';
       case 'sent': return 'Envoyé';
       case 'confirmed': return 'Confirmé';
       case 'delivered': return 'Livré';
@@ -98,6 +104,8 @@ export default function Dashboard() {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
+      case 'pending_approval': return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'approved': return 'bg-green-100 text-green-700 border-green-200';
       case 'delivered': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
       case 'sent': return 'bg-blue-50 text-blue-700 border-blue-100';
       case 'confirmed': return 'bg-indigo-50 text-indigo-700 border-indigo-100';
@@ -112,70 +120,6 @@ export default function Dashboard() {
     { label: 'Alertes Stock', value: products.filter(p => p.stockQuantity <= (p.minStock || 0)).length, icon: AlertTriangle, color: 'red' },
     { label: 'Dépenses Totales', value: `${pos.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0).toLocaleString()} DZD`, icon: TrendingUp, color: 'emerald' }
   ];
-
-  const Analytics = () => {
-    const spendBySupplier = pos.reduce((acc: any, curr) => {
-      acc[curr.supplierName] = (acc[curr.supplierName] || 0) + curr.totalAmount;
-      return acc;
-    }, {});
-
-    const sortedSuppliers = Object.entries(spendBySupplier)
-      .sort(([, a]: any, [, b]: any) => b - a)
-      .slice(0, 5);
-
-    const maxSpend = sortedSuppliers[0]?.[1] as number || 1;
-
-    return (
-      <div className="space-y-8">
-        <div>
-          <h2 className="text-2xl font-bold text-[#1E3A5F] tracking-tight">Analyses de Performance</h2>
-          <p className="text-sm text-gray-500 font-medium">Visualisation des données d'achat et des dépenses</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
-            <h3 className="text-xs font-black text-gray-400 tracking-[0.2em] uppercase mb-8">Top 5 Fournisseurs par Dépense</h3>
-            <div className="space-y-6">
-              {sortedSuppliers.map(([name, amount]: any) => (
-                <div key={name} className="space-y-2">
-                  <div className="flex justify-between items-end">
-                    <span className="text-sm font-bold text-[#1E3A5F]">{name}</span>
-                    <span className="text-sm font-mono font-bold text-blue-600">{amount.toLocaleString()} DZD</span>
-                  </div>
-                  <div className="h-3 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(amount / maxSpend) * 100}%` }}
-                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
-            <h3 className="text-xs font-black text-gray-400 tracking-[0.2em] uppercase mb-8">Répartition des Statuts</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {['draft', 'sent', 'confirmed', 'delivered', 'closed'].map(s => {
-                const count = pos.filter(p => p.status === s).length;
-                const percentage = pos.length > 0 ? (count / pos.length) * 100 : 0;
-                return (
-                  <div key={s} className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
-                    <p className="text-[10px] font-black uppercase text-slate-400 mb-1">{getStatusLabel(s)}</p>
-                    <div className="flex items-end gap-2">
-                      <p className="text-2xl font-black text-[#1E3A5F] leading-none">{count}</p>
-                      <p className="text-[10px] font-bold text-blue-600 pb-0.5">{percentage.toFixed(0)}%</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen flex bg-[#F7F9FC]">
@@ -245,6 +189,12 @@ export default function Dashboard() {
                 className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
               >
                 <Users size={16} /> Utilisateurs
+              </button>
+              <button 
+                onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'settings' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <Settings size={16} /> Paramètres
               </button>
             </>
           )}
@@ -357,7 +307,7 @@ export default function Dashboard() {
                       </div>
                       <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
                       <div className="flex flex-wrap gap-2">
-                        {['all', 'draft', 'sent', 'confirmed', 'delivered', 'closed'].map((status) => (
+                        {['all', 'draft', 'pending_approval', 'approved', 'sent', 'confirmed', 'delivered', 'closed'].map((status) => (
                         <button
                           key={status}
                           onClick={() => setFilterStatus(status)}
@@ -435,6 +385,7 @@ export default function Dashboard() {
             {activeTab === 'analytics' && <motion.div key="analytics" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><Analytics /></motion.div>}
             {activeTab === 'history' && <motion.div key="history" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><ActivityLog /></motion.div>}
             {activeTab === 'users' && role === 'admin' && <motion.div key="users" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><UsersComponent /></motion.div>}
+            {activeTab === 'settings' && role === 'admin' && <motion.div key="settings" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><SettingsComponent /></motion.div>}
           </AnimatePresence>
         </div>
       </main>

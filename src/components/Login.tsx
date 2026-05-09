@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { LogIn, Loader2, ShieldCheck, Globe, Package } from 'lucide-react';
+import { LogIn, UserPlus, Loader2, Package } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function Login() {
@@ -9,49 +9,32 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isLogin, setIsLogin] = useState(true);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
       const email = username.includes('@') ? username : `${username}@pms.local`;
-      await signInWithEmailAndPassword(auth, email, password);
+      
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/operation-not-allowed') {
-        setError("Firebase : L'authentification par email/mot-de-passe n'est pas activée. Veuillez l'activer dans la console Firebase (Authentication > Sign-in method).");
+        setError("Firebase : L'authentification par email/mot-de-passe n'est pas activée.");
       } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
-        if (username === 'admin') {
-           try {
-             const email = username.includes('@') ? username : `${username}@pms.local`;
-             const { createUserWithEmailAndPassword } = await import('firebase/auth');
-             const { setDoc, doc } = await import('firebase/firestore');
-             const { db } = await import('../lib/firebase');
-             const { user } = await createUserWithEmailAndPassword(auth, email, password);
-             await setDoc(doc(db, 'users', user.uid), {
-               uid: user.uid,
-               email: email,
-               displayName: 'Administrateur',
-               role: 'admin',
-               createdAt: new Date().toISOString()
-             });
-             return; // Success
-           } catch (createErr: any) {
-             console.error(createErr);
-             if (createErr.code === 'auth/email-already-in-use') {
-               setError("Mot de passe incorrect pour le compte administrateur.");
-             } else if (createErr.code === 'auth/weak-password') {
-               setError("Le mot de passe doit contenir au moins 6 caractères.");
-             } else {
-               setError("Identifiants invalides. Création automatique de l'admin impossible.");
-             }
-           }
-        } else {
-          setError("Mot de passe ou identifiant incorrect.");
-        }
+        setError("Mot de passe ou identifiant incorrect.");
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError("Un compte existe déjà pour cet email.");
+      } else if (err.code === 'auth/weak-password') {
+        setError("Le mot de passe doit contenir au moins 6 caractères.");
       } else {
-        setError("Échec de la connexion. Vérifiez vos identifiants ou assurez-vous d'avoir créé le compte (Firebase).");
+        setError("L'opération a échoué. Vérifiez vos informations ou votre connexion.");
       }
     } finally {
       setLoading(false);
@@ -73,17 +56,40 @@ export default function Login() {
           <p className="text-slate-500 font-medium">Système de Gestion d'Entrepôt et des Achats</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleAuth} className="space-y-6">
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl mb-6">
+            <button
+              type="button"
+              onClick={() => setIsLogin(true)}
+              className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${
+                isLogin ? 'bg-white text-[#1E3A5F] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Se connecter
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsLogin(false)}
+              className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${
+                !isLogin ? 'bg-white text-[#1E3A5F] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Créer une équipe
+            </button>
+          </div>
+
           <div className="space-y-4">
             <div>
-               <label className="text-xs font-black uppercase tracking-widest text-[#1E3A5F] ml-1 mb-1 block">Identifiant</label>
+               <label className="text-xs font-black uppercase tracking-widest text-[#1E3A5F] ml-1 mb-1 block">
+                 {isLogin ? 'Identifiant / Email' : 'Email de l\'admin'}
+               </label>
                <input
-                 type="text"
+                 type={isLogin ? "text" : "email"}
                  required
                  value={username}
                  onChange={(e) => setUsername(e.target.value)}
                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:bg-white focus:ring-4 focus:ring-blue-50 focus:border-blue-200 outline-none transition-all"
-                 placeholder="admin"
+                 placeholder={isLogin ? "admin" : "contact@entreprise.com"}
                />
             </div>
             <div>
@@ -114,8 +120,8 @@ export default function Login() {
               <Loader2 className="w-6 h-6 animate-spin" />
             ) : (
               <>
-                <LogIn size={20} />
-                Se connecter
+                {isLogin ? <LogIn size={20} /> : <UserPlus size={20} />}
+                {isLogin ? 'Se connecter' : 'Créer l\'équipe'}
               </>
             )}
           </button>
@@ -123,15 +129,14 @@ export default function Login() {
 
       <div className="mt-12 pt-8 border-t border-slate-100 text-center space-y-4">
         <p className="text-[10px] text-slate-400 font-bold tracking-[0.2em] uppercase">
-          Mode Hors-Ligne & Multi-Acheteurs
+          Mode Multi-Équipes
         </p>
         <a 
           href="https://www.linkedin.com/in/benouasser-aymen-chamssedine-93a806197?utm_source=share_via&utm_content=profile&utm_medium=member_android" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+          className="inline-flex items-center gap-2 text-xs text-[#1E3A5F] hover:text-blue-600 font-bold transition-colors"
         >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
           Benouasser Aymen Chamssedine
         </a>
       </div>
