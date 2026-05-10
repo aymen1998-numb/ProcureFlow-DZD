@@ -21,11 +21,16 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
     email: '' 
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is missing. Please refresh the page.');
+      }
       await addDoc(collection(db, 'suppliers'), { 
         ...formData, 
         tenantId: tenantId,
@@ -33,8 +38,9 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
       });
       setFormData({ name: '', nif: '', rc: '', address: '', phone: '', email: '' });
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -71,6 +77,11 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-10 space-y-6">
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium">
+                  {error}
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nom de l'établissement</label>
                 <input 

@@ -27,11 +27,17 @@ export default function Products() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [tenantId]);
+
+  const [error, setError] = useState<string | null>(null);
+  const [loadingForm, setLoadingForm] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoadingForm(true);
+    setError(null);
     try {
+      if (!tenantId) throw new Error("Tenant ID manquant.");
       await addDoc(collection(db, 'products'), { 
         ...formData, 
         tenantId: tenantId,
@@ -40,14 +46,19 @@ export default function Products() {
       });
       setIsModalOpen(false);
       setFormData({ name: '', sku: '', category: '', unit: 'pcs', defaultPrice: 0, stockQuantity: 0, minStock: 0 });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || "Une erreur est survenue.");
+    } finally {
+      setLoadingForm(false);
     }
   };
 
   const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
+    setLoadingForm(true);
+    setError(null);
     
     let newQuantity = selectedProduct.stockQuantity || 0;
     const qty = Number(adjustData.quantity);
@@ -64,8 +75,11 @@ export default function Products() {
       setIsAdjustModalOpen(false);
       setSelectedProduct(null);
       setAdjustData({ quantity: 0, type: 'add', note: '' });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || "Une erreur est survenue.");
+    } finally {
+      setLoadingForm(false);
     }
   };
 
@@ -219,6 +233,11 @@ export default function Products() {
                 <button onClick={() => setIsAdjustModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={18} /></button>
               </div>
               <form onSubmit={handleAdjustStock} className="p-8 space-y-5">
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium">
+                    {error}
+                  </div>
+                )}
                 <div className="flex bg-slate-50 p-1 rounded-xl">
                   {['add', 'remove', 'set'].map(t => (
                     <button
@@ -241,10 +260,10 @@ export default function Products() {
                   <input type="number" required min="0" value={adjustData.quantity} onChange={e => setAdjustData({ ...adjustData, quantity: Number(e.target.value) })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-mono font-black text-center focus:bg-white transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200" />
                 </div>
                 
-                <button type="submit" className={`w-full py-4 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all shadow-xl active:scale-95 mt-2 ${
+                <button type="submit" disabled={loadingForm} className={`w-full py-4 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all shadow-xl active:scale-95 mt-2 disabled:bg-slate-400 disabled:shadow-none ${
                   adjustData.type === 'remove' ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : adjustData.type === 'set' ? 'bg-[#1E3A5F] hover:bg-slate-900 shadow-slate-200' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200'
                 }`}>
-                  Valider l'ajustement
+                  {loadingForm ? 'Mise à jour en cours...' : 'Valider l\'ajustement'}
                 </button>
               </form>
             </motion.div>
@@ -266,6 +285,11 @@ export default function Products() {
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
               </div>
               <form onSubmit={handleSubmit} className="p-10 space-y-6">
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium">
+                    {error}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">SKU / Référence</label>
@@ -307,7 +331,9 @@ export default function Products() {
                     <input type="number" placeholder="0" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: Number(e.target.value) })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold focus:bg-white transition-all" />
                   </div>
                 </div>
-                <button type="submit" className="w-full py-5 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4">Inscrire au Catalogue</button>
+                <button type="submit" disabled={loadingForm} className="w-full py-5 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400">
+                  {loadingForm ? 'Enregistrement en cours...' : 'Inscrire au Catalogue'}
+                </button>
               </form>
             </motion.div>
           </div>

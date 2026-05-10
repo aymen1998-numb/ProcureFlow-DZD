@@ -87,7 +87,7 @@ export default function Dashboard() {
       unsubscribe();
       productsUnsub();
     };
-  }, [user, role]);
+  }, [user, role, tenantId]);
 
   const getStatusLabel = (status: string) => {
     switch (status) {

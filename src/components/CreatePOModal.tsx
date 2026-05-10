@@ -24,6 +24,9 @@ export default function CreatePOModal({ isOpen, onClose }: { isOpen: boolean, on
     } else {
       setPoNumber('');
     }
+  }, [isOpen, tenantId]);
+
+  useEffect(() => {
     if (poNumber) {
       if (!validatePONumber(poNumber)) {
         setPoError("Format requis : PO-YYYY-NNNN (ex: PO-2024-0001)");
@@ -206,7 +209,12 @@ export default function CreatePOModal({ isOpen, onClose }: { isOpen: boolean, on
                 disabled={loading || !selectedSupplier || items.length === 0} 
                 className="w-full py-5 bg-[#3B82F6] hover:bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-blue-200/50 transition-all hover:-translate-y-1"
               >
-                {loading ? <Loader2 className="animate-spin" /> : (
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Création en cours...
+                  </>
+                ) : (
                   <>
                     <Save size={18} />
                     Confirmer la Commande

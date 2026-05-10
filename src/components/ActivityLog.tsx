@@ -46,8 +46,8 @@ export default function ActivityLog() {
   const updateActivities = (newItems: any[], type: string) => {
     setCache(prev => {
       const next = { ...prev, [type]: newItems };
-      const all = Object.values(next).flat().filter(i => i.createdAt);
-      all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const all = Object.values(next).flat().filter((i: any) => i.createdAt);
+      all.sort((a: any, b: any) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
       setActivities(all.slice(0, 50));
       setLoading(false);
       return next;

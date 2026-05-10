@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
@@ -98,6 +98,12 @@ export default function PODetails() {
 
   const handleDeletePO = async () => {
     if (!id) return;
+    if (['sent', 'confirmed', 'delivered', 'closed'].includes(po?.status)) {
+      alert("Action impossible : le bon de commande a déjà été engagé avec le fournisseur.");
+      setIsDeleteDialogOpen(false);
+      return;
+    }
+    
     try {
       await deleteDoc(doc(db, 'purchase_orders', id));
       navigate('/');
@@ -461,12 +467,14 @@ export default function PODetails() {
           <ChevronLeft size={18} /> Retour au Tableau de bord
         </button>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setIsDeleteDialogOpen(true)} 
-            className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all shadow-sm"
-          >
-            <Trash2 size={14} /> Supprimer
-          </button>
+          {(!['sent', 'confirmed', 'delivered', 'closed'].includes(po.status)) && (
+            <button 
+              onClick={() => setIsDeleteDialogOpen(true)} 
+              className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all shadow-sm"
+            >
+              <Trash2 size={14} /> Supprimer
+            </button>
+          )}
           <div className="h-4 w-px bg-gray-200"></div>
           <div className="flex gap-2 flex-wrap justify-end">
             {['draft', 'pending_approval', 'approved', 'sent', 'confirmed', 'delivered', 'closed'].map(s => (
@@ -533,7 +541,7 @@ export default function PODetails() {
             
             <div className="mt-12 pt-10 border-t flex flex-wrap gap-4">
               <button onClick={exportPDF} className="py-4 px-6 flex-1 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-black transition-all">
-                <Download size={18} /> Télécharger (PDF)
+                <FileText size={18} /> Imprimer / PDF
               </button>
               
               {po.status === 'draft' && (
@@ -711,9 +719,12 @@ export default function PODetails() {
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-4xl h-[90vh] flex flex-col">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-black text-[#1E3A5F]">Aperçu du Document PDF</h3>
-                <button onClick={() => setPdfPreview(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
-                  <X size={24} />
-                </button>
+                <div className="flex items-center gap-3">
+                  <a href={pdfPreview} download="Document.pdf" className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-sm">Télécharger</a>
+                  <button onClick={() => setPdfPreview(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+                    <X size={24} />
+                  </button>
+                </div>
               </div>
               <div className="flex-1 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
                 <iframe src={pdfPreview} className="w-full h-full" title="PDF Preview" />

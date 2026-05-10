@@ -24,7 +24,7 @@ export default function Suppliers() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [tenantId]);
 
   const seedFakeSuppliers = async () => {
     const fakes = [
@@ -59,9 +59,16 @@ export default function Suppliers() {
     setIsModalOpen(true);
   };
 
+  const [error, setError] = useState<string | null>(null);
+  const [loadingForm, setLoadingForm] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoadingForm(true);
+    setError(null);
     try {
+      if (!tenantId) throw new Error("Tenant ID manquant. Rechargez la page.");
+
       if (isEditMode && editingSupplierId) {
         await updateDoc(doc(db, 'suppliers', editingSupplierId), { ...formData, updatedAt: new Date().toISOString() });
       } else {
@@ -74,8 +81,11 @@ export default function Suppliers() {
       }
       setIsModalOpen(false);
       setFormData({ name: '', nif: '', rc: '', address: '', phone: '', email: '', bankInfo: '' });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || "Une erreur est survenue.");
+    } finally {
+      setLoadingForm(false);
     }
   };
 
@@ -201,6 +211,11 @@ export default function Suppliers() {
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
               </div>
               <form onSubmit={handleSubmit} className="p-10 space-y-6">
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium">
+                    {error}
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nom de l'établissement</label>
                   <input required placeholder="ex. SARL ALGER LOG" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#1E3A5F] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" />
@@ -229,8 +244,8 @@ export default function Suppliers() {
                     <input type="email" placeholder="contact@fournisseur.dz" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:bg-white transition-all outline-none" />
                   </div>
                 </div>
-                <button type="submit" className="w-full py-5 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4">
-                  {isEditMode ? 'Mettre à jour' : 'Inscrire le Fournisseur'}
+                <button type="submit" disabled={loadingForm} className="w-full py-5 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400">
+                  {loadingForm ? 'Enregistrement...' : isEditMode ? 'Mettre à jour' : 'Inscrire le Fournisseur'}
                 </button>
               </form>
             </motion.div>
