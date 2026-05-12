@@ -49,6 +49,8 @@ interface PO {
   status: string;
   createdAt: string;
   buyerName: string;
+  buyerId?: string;
+  unit?: any;
 }
 
 import SettingsComponent from './Settings';
@@ -59,7 +61,7 @@ import Archive from './Archive';
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
-  const { user, role, tenantId } = useAuth();
+  const { user, role, tenantId, unitId } = useAuth();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'archive' | 'users' | 'settings'>('dashboard');
   const [pos, setPos] = useState<PO[]>([]);
   const [products, setProducts] = useState<any[]>([]);

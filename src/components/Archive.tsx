@@ -45,14 +45,14 @@ export default function Archive() {
       if (!unsubDa) {
         const fallbackDa = query(collection(db, 'purchase_requests'), where('tenantId', '==', tenantId));
         unsubDa = onSnapshot(fallbackDa, snap => {
-          const list = snap.docs.map(d => ({ id: d.id, type: 'DA', ...d.data() })).filter(d => ['archived', 'cancelled', 'done'].includes(d.status));
+          const list = snap.docs.map(d => ({ id: d.id, type: 'DA', ...d.data() })).filter((d: any) => ['archived', 'cancelled', 'done'].includes(d.status));
           setItems(prev => [...prev.filter(p => p.type !== 'DA'), ...list]);
         });
       }
       if (!unsubPo) {
         const fallbackPo = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId));
         unsubPo = onSnapshot(fallbackPo, snap => {
-          const list = snap.docs.map(d => ({ id: d.id, type: 'PO', ...d.data() })).filter(d => ['archived', 'cancelled', 'done'].includes(d.status));
+          const list = snap.docs.map(d => ({ id: d.id, type: 'PO', ...d.data() })).filter((d: any) => ['archived', 'cancelled', 'done'].includes(d.status));
           setItems(prev => [...prev.filter(p => p.type !== 'PO'), ...list]);
           setLoading(false);
         });
