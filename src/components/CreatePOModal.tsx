@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, limit, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc } from 'firebase/firestore';
 import { X, Loader2, Save, ShoppingBag, Search, RefreshCw, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
 
-export default function CreatePOModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+export default function CreatePOModal({ isOpen, onClose, initialData }: { isOpen: boolean, onClose: () => void, initialData?: any }) {
   const { user, tenantId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -22,6 +22,11 @@ export default function CreatePOModal({ isOpen, onClose }: { isOpen: boolean, on
 
   useEffect(() => {
     if (isOpen && tenantId) {
+      if (initialData && initialData.items) {
+        setItems(initialData.items);
+      } else {
+        setItems([]);
+      }
       getDocs(query(collection(db, 'suppliers'), where('tenantId', '==', tenantId))).then(s => setSuppliers(s.docs.map(d => ({id: d.id, ...d.data()}))));
       getDocs(query(collection(db, 'products'), where('tenantId', '==', tenantId))).then(p => setCatalog(p.docs.map(d => ({id: d.id, ...d.data()}))));
       getDocs(query(collection(db, 'tenant_settings'), where('__name__', '==', tenantId))).then(snap => {
@@ -29,7 +34,12 @@ export default function CreatePOModal({ isOpen, onClose }: { isOpen: boolean, on
           const data = snap.docs[0].data();
           if (data.units && data.units.length > 0) {
             setUnits(data.units);
-            setSelectedUnit(data.units[0]);
+            if (initialData && initialData.unitId) {
+                const found = data.units.find((u: any) => u.id === initialData.unitId);
+                setSelectedUnit(found || data.units[0]);
+            } else {
+                setSelectedUnit(data.units[0]);
+            }
           }
         }
       });
@@ -37,7 +47,7 @@ export default function CreatePOModal({ isOpen, onClose }: { isOpen: boolean, on
     } else {
       setPoNumber('');
     }
-  }, [isOpen, tenantId]);
+  }, [isOpen, tenantId, initialData]);
 
   useEffect(() => {
     if (poNumber) {
@@ -90,10 +100,22 @@ export default function CreatePOModal({ isOpen, onClose }: { isOpen: boolean, on
         unit: selectedUnit || null,
         date: new Date().toISOString().split('T')[0], status: 'draft', items, totalAmount: total, totalHT, tvaAmount, tvaRate,
         paymentModality,
+        linkedDA: initialData?.linkedDA || null,
+        daNumber: initialData?.daNumber || null,
         currency: 'DZD', buyerId: user.uid, buyerName: user.displayName || 'Buyer',
         tenantId: tenantId,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       });
+      
+      if (initialData?.linkedDA) {
+        try {
+          await updateDoc(doc(db, 'purchase_requests', initialData.linkedDA), {
+             status: 'done',
+             linkedPONumber: poNumber,
+             updatedAt: new Date().toISOString()
+          });
+        } catch(e) { console.error("Error updating linked DA", e); }
+      }
       onClose();
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'purchase_orders');

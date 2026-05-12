@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { LogIn, UserPlus, Loader2, Package } from 'lucide-react';
+import { LogIn, UserPlus, Loader2, Box } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function Login() {
@@ -50,7 +50,7 @@ export default function Login() {
       >
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-[1.5rem] bg-[#136AA8] text-white shadow-xl mb-6 ring-8 ring-slate-50">
-            <Package size={40} />
+            <Box size={40} />
           </div>
           <h1 className="text-4xl font-bold text-[#136AA8] tracking-tight mb-2">ProcuraFlow</h1>
           <p className="text-slate-500 font-medium">Système de Gestion d'Entrepôt et des Achats</p>

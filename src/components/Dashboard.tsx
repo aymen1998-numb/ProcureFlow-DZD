@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { useTranslation } from 'react-i18next';
 import { 
   BarChart3, 
   Plus, 
@@ -23,7 +24,9 @@ import {
   Menu,
   X,
   Settings,
-  ArrowRightLeft
+  ArrowRightLeft,
+  FileText,
+  Archive as ArchiveIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -51,13 +54,28 @@ interface PO {
 import SettingsComponent from './Settings';
 import Transfers from './Transfers';
 
+import InternalRequests from './InternalRequests';
+import Archive from './Archive';
+
 export default function Dashboard() {
+  const { t, i18n } = useTranslation();
   const { user, role, tenantId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'users' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'archive' | 'users' | 'settings'>('dashboard');
   const [pos, setPos] = useState<PO[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [initialPOData, setInitialPOData] = useState<any>(null);
+
+  const handleConvertDAToPO = (daObj: any) => {
+    setInitialPOData({
+      items: daObj.items.map((i: any) => ({ ...i, price: 0 })),
+      linkedDA: daObj.id,
+      daNumber: daObj.daNumber,
+      unitId: daObj.unitId
+    });
+    setIsModalOpen(true);
+  };
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -74,11 +92,30 @@ export default function Dashboard() {
     // Buyers only see their own POs
     if (role === 'buyer') {
       q = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), where('buyerId', '==', user.uid), orderBy('createdAt', 'desc'));
+    } else if (role === 'magasinier' && unitId) {
+      q = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), where('unit.id', '==', unitId), orderBy('createdAt', 'desc'));
     }
 
     const unsubscribe = onSnapshot(q, (snap) => {
       setPos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PO[]);
       setLoading(false);
+    }, (error) => {
+      if (error.message.includes('index')) {
+        const qFallback = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId));
+        onSnapshot(qFallback, (snap2) => {
+          let docs = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PO[];
+          if (role === 'buyer') {
+            docs = docs.filter(d => d.buyerId === user.uid);
+          } else if (role === 'magasinier' && unitId) {
+            docs = docs.filter((d: any) => d.unit && d.unit.id === unitId);
+          }
+          docs.sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+          setPos(docs);
+          setLoading(false);
+        });
+      } else {
+        console.error(error);
+      }
     });
 
     const productsUnsub = onSnapshot(query(collection(db, 'products'), where('tenantId', '==', tenantId)), (snap) => {
@@ -138,7 +175,7 @@ export default function Dashboard() {
         <div className="h-[58px] bg-[#136AA8] flex items-center justify-between px-5 gap-3 shadow-md">
           <div className="flex items-center gap-3">
              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-teal-400 rounded-lg flex items-center justify-center text-white shadow-inner border border-white/20">
-               <Package size={18} strokeWidth={2.5} />
+               <Box size={18} strokeWidth={2.5} />
              </div>
              <span className="font-bold text-lg tracking-tight text-white uppercase italic">ProcuraFlow</span>
           </div>
@@ -153,38 +190,51 @@ export default function Dashboard() {
             onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
-            <LayoutDashboard size={16} /> Tableau de Bord
+            <LayoutDashboard size={16} /> {t('dashboard')}
+          </button>
+          <button 
+            onClick={() => { setActiveTab('da'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'da' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+          >
+            <FileText size={16} /> {t('da')}
           </button>
           <button 
             onClick={() => { setActiveTab('transfers'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'transfers' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
-            <ArrowRightLeft size={16} /> Transferts
+            <ArrowRightLeft size={16} /> {t('transfers')}
           </button>
           <button 
             onClick={() => { setActiveTab('suppliers'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'suppliers' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
-            <Users size={16} /> Fournisseurs
+            <Users size={16} /> {t('suppliers')}
           </button>
           <button 
             onClick={() => { setActiveTab('products'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'products' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
-            <Box size={16} /> Stocks & Articles
+            <Box size={16} /> {t('products')}
           </button>
           <button 
             onClick={() => { setActiveTab('analytics'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'analytics' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
-            <BarChart3 size={16} /> Analyses
+            <BarChart3 size={16} /> {t('analytics')}
           </button>
           
           <button 
             onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
-            <Clock size={16} /> Historique
+            <Clock size={16} /> {t('history')}
+          </button>
+
+          <button 
+            onClick={() => { setActiveTab('archive'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'archive' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+          >
+            <ArchiveIcon size={16} /> {t('archive')}
           </button>
           
           {role === 'admin' && (
@@ -196,19 +246,32 @@ export default function Dashboard() {
                 onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }}
                 className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
               >
-                <Users size={16} /> Utilisateurs
+                <Users size={16} /> {t('users')}
               </button>
               <button 
                 onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
                 className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'settings' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
               >
-                <Settings size={16} /> Paramètres
+                <Settings size={16} /> {t('settings')}
               </button>
             </>
           )}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 bg-[#F7F9FC]/50">
+        <div className="p-4 border-t border-gray-100 bg-[#F7F9FC]/50 space-y-2">
+          <div className="flex items-center gap-2 justify-between px-2 mb-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Langue / اللغة</span>
+            <button 
+              onClick={() => {
+                const newLang = i18n.language === 'fr' ? 'ar' : 'fr';
+                i18n.changeLanguage(newLang);
+                document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+              }}
+              className="text-xs font-bold text-[#136AA8] bg-blue-50 px-2 py-1 rounded-md"
+            >
+              {i18n.language === 'fr' ? 'AR' : 'FR'}
+            </button>
+          </div>
           <div className="flex items-center gap-3 mb-3 px-2">
             <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-[#009CDA] font-bold border border-blue-200">
               {user?.displayName?.[0] || 'U'}
@@ -219,7 +282,7 @@ export default function Dashboard() {
             </div>
           </div>
           <button onClick={() => auth.signOut()} className="flex items-center gap-3 w-full p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-all font-bold text-[11px] uppercase tracking-wide">
-            <LogOut size={14} /> Déconnexion
+            <LogOut size={14} /> {t('logout')}
           </button>
         </div>
       </aside>
@@ -388,6 +451,8 @@ export default function Dashboard() {
               </motion.div>
             )}
 
+            {activeTab === 'da' && <motion.div key="da" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><InternalRequests onConvertToPO={handleConvertDAToPO} /></motion.div>}
+            {activeTab === 'archive' && <motion.div key="archive" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Archive /></motion.div>}
             {activeTab === 'transfers' && <motion.div key="transfers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Transfers /></motion.div>}
             {activeTab === 'suppliers' && <motion.div key="suppliers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Suppliers /></motion.div>}
             {activeTab === 'products' && <motion.div key="products" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Products /></motion.div>}
@@ -399,7 +464,7 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <CreatePOModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <CreatePOModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setInitialPOData(null); }} initialData={initialPOData} />
       <AddSupplierModal isOpen={isSupplierModalOpen} onClose={() => setIsSupplierModalOpen(false)} />
     </div>
   );

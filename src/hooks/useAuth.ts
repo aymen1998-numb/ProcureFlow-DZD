@@ -5,8 +5,9 @@ import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<'admin' | 'buyer' | 'finance' | null>(null);
+  const [role, setRole] = useState<'admin' | 'buyer' | 'finance' | 'magasinier' | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [unitId, setUnitId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,6 +20,7 @@ export function useAuth() {
           if (userDoc.exists()) {
             let currentRole = userDoc.data().role;
             let currentTenantId = userDoc.data().tenantId;
+            let currentUnitId = userDoc.data().unitId || null;
             
             if (!currentTenantId) {
               currentTenantId = firebaseUser.uid;
@@ -29,11 +31,9 @@ export function useAuth() {
               }
             }
             
-            // Removed the old hardcoded admin@procuraflow.dz override to allow proper tenant assignment
             setRole(currentRole);
             setTenantId(currentTenantId);
-            // We expose user document data in hook State? Actually let's just make it accessible 
-            // We'll update the user object or return tenantId from useAuth
+            setUnitId(currentUnitId);
           } else {
             // New Uninvited User -> Creates their own Tenant
             const newTenantId = firebaseUser.uid;
@@ -52,6 +52,7 @@ export function useAuth() {
             }
             setRole('admin');
             setTenantId(newTenantId);
+            setUnitId(null);
           }
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -60,6 +61,7 @@ export function useAuth() {
         setUser(null);
         setRole(null);
         setTenantId(null);
+        setUnitId(null);
       }
       setLoading(false);
     });
@@ -67,5 +69,5 @@ export function useAuth() {
     return () => unsubscribe();
   }, []);
 
-  return { user, role, tenantId, loading };
+  return { user, role, tenantId, unitId, loading };
 }

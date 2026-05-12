@@ -68,6 +68,36 @@ export default function Analytics() {
     value: ordersByStatus[status]
   }));
 
+  // 4. Most Frequently Bought Products (By Quantity)
+  const productQuantities = pos.reduce((acc, po) => {
+    if (po.status !== 'cancelled' && po.items) {
+      po.items.forEach((item: any) => {
+        const prodName = item.name || 'Unknown';
+        acc[prodName] = (acc[prodName] || 0) + (Number(item.quantity) || 0);
+      });
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  const topProductsData = Object.keys(productQuantities).map(prod => ({
+    name: prod,
+    Quantité: productQuantities[prod]
+  })).sort((a, b) => b.Quantité - a.Quantité).slice(0, 10);
+
+  // 5. Spending by Unit / Department
+  const spendingByUnit = pos.reduce((acc, po) => {
+    if (po.status !== 'cancelled') {
+        const unitName = po.unit?.name || 'Siège HQ';
+        acc[unitName] = (acc[unitName] || 0) + (Number(po.totalAmount) || 0);
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  const unitData = Object.keys(spendingByUnit).map(unit => ({
+    name: unit,
+    value: spendingByUnit[unit]
+  })).sort((a, b) => b.value - a.value);
+
   return (
     <div className="space-y-6">
       <div className="mb-6">
@@ -119,6 +149,53 @@ export default function Analytics() {
                 </Pie>
                 <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Legend iconType="circle" />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Top 10 Products by Quantity */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-700 mb-6 flex items-center gap-2">
+            <Package size={16} className="text-orange-500" />
+            Top 10 Produits les plus demandés (Qté)
+          </h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topProductsData} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f0f0f0" />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis dataKey="name" type="category" width={80} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#475569' }} />
+                <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Bar dataKey="Quantité" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Spending by Unit (Pie / Donut) */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-700 mb-6 flex items-center gap-2">
+            <DollarSign size={16} className="text-rose-500" />
+            Dépenses par Unité / Département
+          </h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={unitData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {unitData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip formatter={(val: number) => `${val.toLocaleString()} DZD`} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>

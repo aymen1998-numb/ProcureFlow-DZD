@@ -30,7 +30,13 @@ service cloud.firestore {
       allow get: if isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId());
       allow list: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().uid == userId;
-      allow update: if (isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId())) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'email', 'createdAt', 'tenantId']);
+      allow update: if (isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId())) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'email', 'createdAt', 'tenantId', 'unitId']);
+    }
+
+    match /purchase_requests/{reqId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
     }
 
     match /suppliers/{supplierId} {

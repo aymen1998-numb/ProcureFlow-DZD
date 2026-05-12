@@ -221,78 +221,72 @@ export default function PODetails() {
   };
 
   const printCompanyHeader = (doc: any, title: string, contextObj?: any) => {
-      doc.setFontSize(24);
+      doc.setFontSize(22);
       doc.setTextColor(19, 106, 168);
-      doc.text(title, 14, 25);
-      
-      const unitData = contextObj?.unit;
+      doc.text(title, 105, 25, { align: 'center' });
       
       if (companySettings) {
-        let yPosBase = 25;
-        if (companySettings.logoUrl) {
+        if (companySettings.logoUrl && companySettings.logoUrl.startsWith('data:image')) {
           try {
-            // Only add if it looks like a valid base64 image
-            if (companySettings.logoUrl.startsWith('data:image')) {
-              let targetWidth = 50;
-              let targetHeight = 15;
-              let logoX = 140;
-              let logoY = 5;
-              try {
-                const imgProps = doc.getImageProperties(companySettings.logoUrl);
-                const maxHeight = 24;
-                const maxWidth = 55;
-                const ratio = imgProps.width / imgProps.height;
-                targetHeight = maxHeight;
-                targetWidth = maxHeight * ratio;
-                
-                if (targetWidth > maxWidth) {
-                  targetWidth = maxWidth;
-                  targetHeight = maxWidth / ratio;
-                }
-                logoX = 196 - targetWidth;
-                logoY = 8;
-                yPosBase = logoY + targetHeight + 6;
-              } catch(e) { console.error("Error reading logo properties", e); }
-              
-              doc.addImage(companySettings.logoUrl, companySettings.logoUrl.includes('image/png') ? 'PNG' : 'JPEG', logoX, logoY, targetWidth, targetHeight);
+            let targetWidth = 40;
+            let targetHeight = 15;
+            const imgProps = doc.getImageProperties(companySettings.logoUrl);
+            const maxHeight = 20;
+            const maxWidth = 50;
+            const ratio = imgProps.width / imgProps.height;
+            targetHeight = maxHeight;
+            targetWidth = maxHeight * ratio;
+            
+            if (targetWidth > maxWidth) {
+              targetWidth = maxWidth;
+              targetHeight = maxWidth / ratio;
             }
+            doc.addImage(companySettings.logoUrl, companySettings.logoUrl.includes('image/png') ? 'PNG' : 'JPEG', 14, 10, targetWidth, targetHeight);
           } catch(e) { console.error("Error adding logo", e); }
         }
-        
-        doc.setFontSize(12);
-        doc.setTextColor(19, 106, 168);
-        
-        const companyLines = [];
-        companyLines.push(unitData?.name || companySettings.companyName || '');
-        if (unitData?.name && companySettings.companyName) {
-           companyLines.push(`Groupe: ${companySettings.companyName}`);
-        }
-        
-        doc.text(companyLines[0], 196, yPosBase, { align: 'right' });
-        
-        doc.setFontSize(10);
-        doc.setTextColor(100, 116, 139);
-        
-        let currentY = yPosBase + 5;
-        if (companyLines[1]) {
-           doc.text(companyLines[1], 196, currentY, { align: 'right' });
-           currentY += 5;
-        }
-        
-        const address = unitData?.address || companySettings.address;
-        if (address) {
-           doc.text(address, 196, currentY, { align: 'right' });
-           currentY += 5;
-        }
-        
-        const nif = unitData?.nif || companySettings.nif;
-        const rc = unitData?.rc || companySettings.rc;
-        const ai = unitData?.ai || companySettings.ai;
-        
-        if (nif) { doc.text(`NIF: ${nif}`, 196, currentY, { align: 'right' }); currentY += 5; }
-        if (rc) { doc.text(`RC: ${rc}`, 196, currentY, { align: 'right' }); currentY += 5; }
-        if (ai) { doc.text(`AI: ${ai}`, 196, currentY, { align: 'right' }); }
       }
+  };
+
+  const printAddressesBoxes = (doc: any, yPos: number, contextObj: any) => {
+      const unitData = contextObj?.unit;
+      
+      // Factory (Left)
+      doc.setFontSize(11);
+      doc.setTextColor(19, 106, 168);
+      doc.text("Acheteur / Unité :", 14, yPos);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      let leftY = yPos + 6;
+      doc.text(`${unitData?.name || companySettings?.companyName || 'Usine'}`, 14, leftY); leftY += 5;
+      if (unitData?.name && companySettings?.companyName) {
+         doc.text(`Groupe: ${companySettings.companyName}`, 14, leftY); leftY += 5;
+      }
+      const fAddr = unitData?.address || companySettings?.address;
+      if (fAddr) { doc.text(`Adresse: ${fAddr}`, 14, leftY); leftY += 5; }
+      const fNif = unitData?.nif || companySettings?.nif;
+      if (fNif) { doc.text(`NIF: ${fNif}`, 14, leftY); leftY += 5; }
+      const fRc = unitData?.rc || companySettings?.rc;
+      if (fRc) { doc.text(`RC: ${fRc}`, 14, leftY); leftY += 5; }
+      const fAi = unitData?.ai || companySettings?.ai;
+      if (fAi) { doc.text(`AI: ${fAi}`, 14, leftY); leftY += 5; }
+      
+      // Supplier (Right)
+      doc.setFontSize(11);
+      doc.setTextColor(19, 106, 168);
+      doc.text("Destinataire (Fournisseur) :", 110, yPos);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      let rightY = yPos + 6;
+      doc.text(`${supplier?.name || po.supplierName || ''}`, 110, rightY); rightY += 5;
+      if (supplier?.address) { doc.text(`Adresse: ${supplier.address}`, 110, rightY); rightY += 5; }
+      if (supplier?.nif) { doc.text(`NIF: ${supplier.nif}`, 110, rightY); rightY += 5; }
+      if (supplier?.nis) { doc.text(`NIS: ${supplier.nis}`, 110, rightY); rightY += 5; }
+      if (supplier?.rc) { doc.text(`RC: ${supplier.rc}`, 110, rightY); rightY += 5; }
+      if (supplier?.ai) { doc.text(`AI: ${supplier.ai}`, 110, rightY); rightY += 5; }
+
+      return Math.max(leftY, rightY) + 10;
   };
 
   const exportPDF = () => {
@@ -300,32 +294,21 @@ export default function PODetails() {
       const doc = new jsPDF();
       printCompanyHeader(doc, "BON DE COMMANDE", po);
       
+      let nextY = printAddressesBoxes(doc, 45, po);
+      
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139); // slate-500
-      let leftY = 35;
-      doc.text(`BC N° : ${po.poNumber}`, 14, leftY); leftY += 5;
-      doc.text(`Date : ${po.date}`, 14, leftY); leftY += 5;
-      doc.text(`Acheteur : ${po.buyerName}`, 14, leftY); leftY += 5;
-      doc.text(`Paiement : ${po.paymentModality || 'Non spécifié'}`, 14, leftY); leftY += 10;
-      
-      doc.setFontSize(11);
-      doc.setTextColor(19, 106, 168);
-      doc.text("Destinataire :", 14, leftY); leftY += 5;
-      
-      doc.setFontSize(10);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Fournisseur : ${po.supplierName}`, 14, leftY); leftY += 5;
-      if (supplier?.address) { doc.text(`Adresse: ${supplier.address}`, 14, leftY); leftY += 5; }
-      if (supplier?.nif) { doc.text(`NIF: ${supplier.nif}`, 14, leftY); leftY += 5; }
-      if (supplier?.nis) { doc.text(`NIS: ${supplier.nis}`, 14, leftY); leftY += 5; }
-      if (supplier?.rc) { doc.text(`RC: ${supplier.rc}`, 14, leftY); leftY += 5; }
-      if (supplier?.ai) { doc.text(`AI: ${supplier.ai}`, 14, leftY); leftY += 5; }
+      let detailsY = nextY;
+      doc.text(`BC N° : ${po.poNumber}`, 14, detailsY); detailsY += 5;
+      doc.text(`Date : ${po.date}`, 14, detailsY); detailsY += 5;
+      doc.text(`Acheteur : ${po.buyerName}`, 14, detailsY); detailsY += 5;
+      doc.text(`Paiement : ${po.paymentModality || 'Non spécifié'}`, 14, detailsY); detailsY += 5;
       
       const tableData = po.items.map((item: any) => [
         item.sku, item.name, item.quantity, item.price?.toLocaleString(), (item.quantity * item.price)?.toLocaleString()
       ]);
 
-      const tableStartY = Math.max(leftY + 5, 80);
+      const tableStartY = detailsY + 5;
 
       autoTable(doc, {
         head: [['SKU', 'Produit', 'Qté', 'Prix Unit. (DZD)', 'Total']],
@@ -366,32 +349,21 @@ export default function PODetails() {
       const doc = new jsPDF();
       printCompanyHeader(doc, "BON DE LIVRAISON", po);
 
+      let nextY = printAddressesBoxes(doc, 45, po);
+
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
-      let leftY = 35;
-      doc.text(`BL N° : ${del.dnNumber}`, 14, leftY); leftY += 5;
-      doc.text(`BC Associé : ${po.poNumber}`, 14, leftY); leftY += 5;
-      doc.text(`Date Réception : ${del.date}`, 14, leftY); leftY += 5;
-      doc.text(`Réceptionné par : ${del.receivedBy}`, 14, leftY); leftY += 10;
-      
-      doc.setFontSize(11);
-      doc.setTextColor(19, 106, 168);
-      doc.text("Expéditeur :", 14, leftY); leftY += 5;
-      
-      doc.setFontSize(10);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Fournisseur : ${po.supplierName}`, 14, leftY); leftY += 5;
-      if (supplier?.address) { doc.text(`Adresse: ${supplier.address}`, 14, leftY); leftY += 5; }
-      if (supplier?.nif) { doc.text(`NIF: ${supplier.nif}`, 14, leftY); leftY += 5; }
-      if (supplier?.nis) { doc.text(`NIS: ${supplier.nis}`, 14, leftY); leftY += 5; }
-      if (supplier?.rc) { doc.text(`RC: ${supplier.rc}`, 14, leftY); leftY += 5; }
-      if (supplier?.ai) { doc.text(`AI: ${supplier.ai}`, 14, leftY); leftY += 5; }
+      let detailsY = nextY;
+      doc.text(`BL N° : ${del.dnNumber}`, 14, detailsY); detailsY += 5;
+      doc.text(`BC Associé : ${po.poNumber}`, 14, detailsY); detailsY += 5;
+      doc.text(`Date Réception : ${del.date}`, 14, detailsY); detailsY += 5;
+      doc.text(`Réceptionné par : ${del.receivedBy}`, 14, detailsY); detailsY += 5;
       
       const tableData = (del.items || []).map((item: any) => [
         item.sku, item.name, item.quantity_delivered || item.quantity, item.unit || 'pcs'
       ]);
 
-      const tableStartY = Math.max(leftY + 5, 80);
+      const tableStartY = detailsY + 5;
 
       autoTable(doc, {
         head: [['SKU', 'Produit', 'Qté Livrée', 'Unité']],
@@ -427,32 +399,21 @@ export default function PODetails() {
       const doc = new jsPDF();
       printCompanyHeader(doc, "FACTURE", po);
 
+      let nextY = printAddressesBoxes(doc, 45, po);
+
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
-      let leftY = 35;
-      doc.text(`Facture N° : ${inv.invNumber}`, 14, leftY); leftY += 5;
-      doc.text(`BC Associé : ${po.poNumber}`, 14, leftY); leftY += 5;
-      doc.text(`Date : ${inv.date}`, 14, leftY); leftY += 10;
-      
-      doc.setFontSize(11);
-      doc.setTextColor(19, 106, 168);
-      doc.text("Émetteur :", 14, leftY); leftY += 5;
-      
-      doc.setFontSize(10);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Fournisseur : ${po.supplierName}`, 14, leftY); leftY += 5;
-      if (supplier?.address) { doc.text(`Adresse: ${supplier.address}`, 14, leftY); leftY += 5; }
-      if (supplier?.nif) { doc.text(`NIF: ${supplier.nif}`, 14, leftY); leftY += 5; }
-      if (supplier?.nis) { doc.text(`NIS: ${supplier.nis}`, 14, leftY); leftY += 5; }
-      if (supplier?.rc) { doc.text(`RC: ${supplier.rc}`, 14, leftY); leftY += 5; }
-      if (supplier?.ai) { doc.text(`AI: ${supplier.ai}`, 14, leftY); leftY += 5; }
-      if (supplier?.bankInfo) { doc.text(`Banque: ${supplier.bankInfo}`, 14, leftY); leftY += 5; }
+      let detailsY = nextY;
+      doc.text(`Facture N° : ${inv.invNumber}`, 14, detailsY); detailsY += 5;
+      doc.text(`BC Associé : ${po.poNumber}`, 14, detailsY); detailsY += 5;
+      doc.text(`Date : ${inv.date}`, 14, detailsY); detailsY += 5;
+      if (supplier?.bankInfo) { doc.text(`Banque Fournisseur: ${supplier.bankInfo}`, 14, detailsY); detailsY += 5; }
       
       const tableData = po.items.map((item: any) => [
         item.sku, item.name, item.quantity, item.price?.toLocaleString(), (item.quantity * item.price)?.toLocaleString()
       ]);
 
-      const tableStartY = Math.max(leftY + 5, 80);
+      const tableStartY = detailsY + 5;
 
       autoTable(doc, {
         head: [['SKU', 'Produit', 'Qté', 'Prix Unit. (DZD)', 'Total']],

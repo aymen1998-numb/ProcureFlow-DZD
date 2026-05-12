@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, setDoc, doc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, setDoc, doc, where, getDoc } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { Shield, Plus, Users as UsersIcon, X, Loader2 } from 'lucide-react';
@@ -21,13 +21,31 @@ export default function Users() {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    role: 'buyer'
+    role: 'buyer',
+    unitId: ''
   });
 
   const [error, setError] = useState<string | null>(null);
 
+  const [units, setUnits] = useState<any[]>([]);
+  
   useEffect(() => {
     if (!tenantId) return;
+    
+    // Fetch units from tenant settings
+    const fetchUnits = async () => {
+      try {
+        const docRef = doc(db, 'tenant_settings', tenantId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().units) {
+          setUnits(docSnap.data().units);
+        }
+      } catch (err) {
+        console.error("Error fetching units", err);
+      }
+    };
+    fetchUnits();
+
     const q = query(collection(db, 'users'), where('tenantId', '==', tenantId));
     const unsubscribe = onSnapshot(q, (snap) => {
       setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -43,7 +61,7 @@ export default function Users() {
     setIsEditMode(false);
     setEditingUserId(null);
     setSelectedUser(null);
-    setFormData({ username: '', password: '', role: 'buyer' });
+    setFormData({ username: '', password: '', role: 'buyer', unitId: '' });
     setError(null);
     setIsModalOpen(true);
   };
@@ -52,7 +70,7 @@ export default function Users() {
     setIsEditMode(true);
     setEditingUserId(user.id);
     setSelectedUser(user);
-    setFormData({ username: user.displayName, password: '', role: user.role });
+    setFormData({ username: user.displayName, password: '', role: user.role, unitId: user.unitId || '' });
     setError(null);
     setIsModalOpen(true);
   };
@@ -74,6 +92,11 @@ export default function Users() {
       if (isEditMode && editingUserId) {
          const { updateDoc } = await import('firebase/firestore');
          const updateData: any = { role: formData.role };
+         if (formData.role === 'magasinier') {
+           updateData.unitId = formData.unitId;
+         } else {
+           updateData.unitId = null;
+         }
          await updateDoc(doc(db, 'users', editingUserId), updateData);
       } else {
         const secondaryApp = initializeApp(firebaseConfig, "Secondary");
@@ -84,21 +107,27 @@ export default function Users() {
         const { user } = await createUserWithEmailAndPassword(secondaryAuth, email, formData.password);
         await updateProfile(user, { displayName: formData.username });
         
-        await setDoc(doc(db, 'users', user.uid), {
+        const userData: any = {
           uid: user.uid,
           email: email,
           displayName: formData.username,
           role: formData.role,
           tenantId: tenantId,
           createdAt: new Date().toISOString(),
-          createdBy: "Admin" // You can pass currentUser.displayName if passed, but it's fine
-        });
+          createdBy: "Admin" 
+        };
+        
+        if (formData.role === 'magasinier') {
+          userData.unitId = formData.unitId;
+        }
+
+        await setDoc(doc(db, 'users', user.uid), userData);
         
         await secondaryAuth.signOut();
       }
       
       setIsModalOpen(false);
-      setFormData({ username: '', password: '', role: 'buyer' });
+      setFormData({ username: '', password: '', role: 'buyer', unitId: '' });
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
@@ -155,11 +184,12 @@ export default function Users() {
                   <select
                     value={user.role || 'buyer'}
                     onChange={(e) => handleUpdateRole(user.id, e.target.value)}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest outline-none border cursor-pointer hover:shadow-sm transition-all ${user.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : user.role === 'finance' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100'}`}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest outline-none border cursor-pointer hover:shadow-sm transition-all ${user.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : user.role === 'finance' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : user.role === 'magasinier' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-blue-50 text-blue-700 border-blue-100'}`}
                   >
                     <option value="admin">Administrateur</option>
                     <option value="finance">Finance</option>
-                    <option value="buyer">Modérateur / Acheteur</option>
+                    <option value="buyer">Acheteur</option>
+                    <option value="magasinier">Magasinier</option>
                   </select>
                 </div>
               </div>
@@ -201,9 +231,21 @@ export default function Users() {
                     <select required value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:bg-white transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200">
                       <option value="admin">Administrateur</option>
                       <option value="finance">Finance</option>
-                      <option value="buyer">Modérateur / Acheteur</option>
+                      <option value="buyer">Acheteur</option>
+                      <option value="magasinier">Magasinier (Responsable Magasin)</option>
                     </select>
                   </div>
+                  {formData.role === 'magasinier' && (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Unité d'Affectation</label>
+                      <select required value={formData.unitId} onChange={e => setFormData({...formData, unitId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:bg-white transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200">
+                        <option value="">Sélectionner une unité...</option>
+                        {units.map((u: any) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   {isEditMode && selectedUser?.createdAt && (
                     <div className="pt-2">
                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center">Créé le : {new Date(selectedUser.createdAt).toLocaleDateString('fr-FR')} à {new Date(selectedUser.createdAt).toLocaleTimeString('fr-FR')}</p>
