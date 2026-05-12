@@ -116,7 +116,7 @@ export default function Users() {
   };
 
   if (loading) return (
-    <div className="flex justify-center p-10 text-[#1E3A5F]">
+    <div className="flex justify-center p-10 text-[#136AA8]">
       <Loader2 className="animate-spin w-8 h-8" />
     </div>
   );
@@ -125,15 +125,15 @@ export default function Users() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black text-[#1E3A5F] tracking-tight uppercase flex items-center gap-3">
-            <UsersIcon className="text-blue-600" />
+          <h2 className="text-2xl font-black text-[#136AA8] tracking-tight uppercase flex items-center gap-3">
+            <UsersIcon className="text-[#009CDA]" />
             Équipe & Utilisateurs
           </h2>
           <p className="text-slate-500 font-medium mt-1">Gérez les accès administrateurs et modérateurs (acheteurs).</p>
         </div>
         <button 
           onClick={openCreateModal}
-          className="flex items-center gap-2 bg-[#1E3A5F] text-white px-5 py-3 rounded-2xl font-bold hover:bg-[#152945] transition-all hover:shadow-lg active:scale-95"
+          className="flex items-center gap-2 bg-[#136AA8] text-white px-5 py-3 rounded-2xl font-bold hover:bg-[#152945] transition-all hover:shadow-lg active:scale-95"
         >
           <Plus size={18} />
           <span className="hidden sm:inline">Nouvel Utilisateur</span>
@@ -148,7 +148,7 @@ export default function Users() {
                 {user.displayName?.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-[#1E3A5F] text-lg">{user.displayName}</h3>
+                <h3 className="font-bold text-[#136AA8] text-lg">{user.displayName}</h3>
                 <p className="text-xs text-slate-400 mb-1 truncate">{user.email}</p>
                 <p className="text-[10px] text-slate-400 font-medium">Créé le : {user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-FR') : 'Date inconnue'}</p>
                 <div className="flex items-center gap-2 mt-2">
@@ -166,7 +166,7 @@ export default function Users() {
             </div>
             <button
                onClick={() => openEditModal(user)}
-               className="hidden group-hover:flex absolute top-4 right-4 bg-slate-100 text-slate-400 p-2 rounded-lg hover:bg-[#1E3A5F] hover:text-white transition-colors"
+               className="hidden group-hover:flex absolute top-4 right-4 bg-slate-100 text-slate-400 p-2 rounded-lg hover:bg-[#136AA8] hover:text-white transition-colors"
                title="Modifier l'utilisateur"
             >
                <UsersIcon size={16} /> {/* Can use an Edit icon here ideally, but using UsersIcon as fallback */}
@@ -180,7 +180,7 @@ export default function Users() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-md bg-white rounded-[2rem] overflow-hidden shadow-2xl">
-              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-[#1E3A5F] text-white">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
                 <div>
                   <h3 className="text-lg font-black uppercase tracking-tight">{isEditMode ? 'Modifier Utilisateur' : 'Ajouter un Utilisateur'}</h3>
                 </div>
@@ -213,7 +213,7 @@ export default function Users() {
                 
                 {error && <div className="text-red-500 text-xs font-bold text-center mt-2">{error}</div>}
                 
-                <button type="submit" disabled={isSubmitting} className="w-full py-4 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-[#152945] transition-all shadow-xl active:scale-95 disabled:opacity-50 flex justify-center items-center gap-2 mt-4">
+                <button type="submit" disabled={isSubmitting} className="w-full py-4 bg-[#136AA8] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-[#152945] transition-all shadow-xl active:scale-95 disabled:opacity-50 flex justify-center items-center gap-2 mt-4">
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isEditMode ? 'Mettre à jour' : "Créer l'utilisateur"}
                 </button>

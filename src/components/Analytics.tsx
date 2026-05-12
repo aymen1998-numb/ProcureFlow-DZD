@@ -28,7 +28,7 @@ export default function Analytics() {
   }, [tenantId]);
 
   if (loading) {
-    return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+    return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-[#009CDA]" /></div>;
   }
 
   // 1. Total Spending Per Month
@@ -71,7 +71,7 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-[#1E3A5F]">Analyses avancées</h2>
+        <h2 className="text-xl font-bold text-[#136AA8]">Analyses avancées</h2>
         <p className="text-sm text-gray-500">Aperçu visuel de vos dépenses et statuts de commandes.</p>
       </div>
 

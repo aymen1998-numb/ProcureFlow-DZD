@@ -220,47 +220,132 @@ export default function PODetails() {
     } catch (err) { console.error(err); }
   };
 
+  const printCompanyHeader = (doc: any, title: string, contextObj?: any) => {
+      doc.setFontSize(24);
+      doc.setTextColor(19, 106, 168);
+      doc.text(title, 14, 25);
+      
+      const unitData = contextObj?.unit;
+      
+      if (companySettings) {
+        let yPosBase = 25;
+        if (companySettings.logoUrl) {
+          try {
+            // Only add if it looks like a valid base64 image
+            if (companySettings.logoUrl.startsWith('data:image')) {
+              let targetWidth = 50;
+              let targetHeight = 15;
+              let logoX = 140;
+              let logoY = 5;
+              try {
+                const imgProps = doc.getImageProperties(companySettings.logoUrl);
+                const maxHeight = 24;
+                const maxWidth = 55;
+                const ratio = imgProps.width / imgProps.height;
+                targetHeight = maxHeight;
+                targetWidth = maxHeight * ratio;
+                
+                if (targetWidth > maxWidth) {
+                  targetWidth = maxWidth;
+                  targetHeight = maxWidth / ratio;
+                }
+                logoX = 196 - targetWidth;
+                logoY = 8;
+                yPosBase = logoY + targetHeight + 6;
+              } catch(e) { console.error("Error reading logo properties", e); }
+              
+              doc.addImage(companySettings.logoUrl, companySettings.logoUrl.includes('image/png') ? 'PNG' : 'JPEG', logoX, logoY, targetWidth, targetHeight);
+            }
+          } catch(e) { console.error("Error adding logo", e); }
+        }
+        
+        doc.setFontSize(12);
+        doc.setTextColor(19, 106, 168);
+        
+        const companyLines = [];
+        companyLines.push(unitData?.name || companySettings.companyName || '');
+        if (unitData?.name && companySettings.companyName) {
+           companyLines.push(`Groupe: ${companySettings.companyName}`);
+        }
+        
+        doc.text(companyLines[0], 196, yPosBase, { align: 'right' });
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139);
+        
+        let currentY = yPosBase + 5;
+        if (companyLines[1]) {
+           doc.text(companyLines[1], 196, currentY, { align: 'right' });
+           currentY += 5;
+        }
+        
+        const address = unitData?.address || companySettings.address;
+        if (address) {
+           doc.text(address, 196, currentY, { align: 'right' });
+           currentY += 5;
+        }
+        
+        const nif = unitData?.nif || companySettings.nif;
+        const rc = unitData?.rc || companySettings.rc;
+        const ai = unitData?.ai || companySettings.ai;
+        
+        if (nif) { doc.text(`NIF: ${nif}`, 196, currentY, { align: 'right' }); currentY += 5; }
+        if (rc) { doc.text(`RC: ${rc}`, 196, currentY, { align: 'right' }); currentY += 5; }
+        if (ai) { doc.text(`AI: ${ai}`, 196, currentY, { align: 'right' }); }
+      }
+  };
+
   const exportPDF = () => {
     try {
       const doc = new jsPDF();
-      doc.setFontSize(24);
-      doc.setTextColor(30, 58, 95); // #1E3A5F
-      doc.text("BON DE COMMANDE", 14, 25);
-      
-      if (companySettings) {
-        doc.setFontSize(12);
-        doc.setTextColor(30, 58, 95);
-        doc.text(companySettings.companyName || '', 140, 25);
-        doc.setFontSize(10);
-        doc.setTextColor(100, 116, 139);
-        doc.text(companySettings.address || '', 140, 32);
-        doc.text(`NIF/RC: ${companySettings.taxId || '-'}`, 140, 39);
-      }
+      printCompanyHeader(doc, "BON DE COMMANDE", po);
       
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139); // slate-500
-      doc.text(`BC N° : ${po.poNumber}`, 14, 35);
-      doc.text(`Fournisseur : ${po.supplierName}`, 14, 40);
-      doc.text(`Date : ${po.date}`, 14, 45);
-      doc.text(`Acheteur : ${po.buyerName}`, 14, 50);
+      let leftY = 35;
+      doc.text(`BC N° : ${po.poNumber}`, 14, leftY); leftY += 5;
+      doc.text(`Date : ${po.date}`, 14, leftY); leftY += 5;
+      doc.text(`Acheteur : ${po.buyerName}`, 14, leftY); leftY += 5;
+      doc.text(`Paiement : ${po.paymentModality || 'Non spécifié'}`, 14, leftY); leftY += 10;
+      
+      doc.setFontSize(11);
+      doc.setTextColor(19, 106, 168);
+      doc.text("Destinataire :", 14, leftY); leftY += 5;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Fournisseur : ${po.supplierName}`, 14, leftY); leftY += 5;
+      if (supplier?.address) { doc.text(`Adresse: ${supplier.address}`, 14, leftY); leftY += 5; }
+      if (supplier?.nif) { doc.text(`NIF: ${supplier.nif}`, 14, leftY); leftY += 5; }
+      if (supplier?.nis) { doc.text(`NIS: ${supplier.nis}`, 14, leftY); leftY += 5; }
+      if (supplier?.rc) { doc.text(`RC: ${supplier.rc}`, 14, leftY); leftY += 5; }
+      if (supplier?.ai) { doc.text(`AI: ${supplier.ai}`, 14, leftY); leftY += 5; }
       
       const tableData = po.items.map((item: any) => [
         item.sku, item.name, item.quantity, item.price?.toLocaleString(), (item.quantity * item.price)?.toLocaleString()
       ]);
 
+      const tableStartY = Math.max(leftY + 5, 80);
+
       autoTable(doc, {
         head: [['SKU', 'Produit', 'Qté', 'Prix Unit. (DZD)', 'Total']],
         body: tableData,
-        startY: 60,
+        startY: tableStartY,
         theme: 'grid',
-        headStyles: { fillColor: [30, 58, 95], fontStyle: 'bold' },
+        headStyles: { fillColor: [19, 106, 168], fontStyle: 'bold' },
         styles: { fontSize: 9 }
       });
 
       const finalY = (doc as any).lastAutoTable?.finalY || 150;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      if (po.tvaRate !== undefined) {
+        doc.text(`Total HT : ${po.totalHT?.toLocaleString()} DZD`, 196, finalY + 10, { align: 'right' });
+        doc.text(`TVA (${po.tvaRate}%) : ${po.tvaAmount?.toLocaleString()} DZD`, 196, finalY + 15, { align: 'right' });
+      }
       doc.setFontSize(14);
-      doc.setTextColor(30, 58, 95);
-      doc.text(`Montant Total : ${po.totalAmount?.toLocaleString()} DZD`, 14, finalY + 15);
+      doc.setTextColor(19, 106, 168);
+      doc.text(`Montant Total TTC : ${po.totalAmount?.toLocaleString()} DZD`, 196, finalY + (po.tvaRate !== undefined ? 25 : 15), { align: 'right' });
       
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
@@ -279,36 +364,39 @@ export default function PODetails() {
   const exportDeliveryPDF = (del: any) => {
     try {
       const doc = new jsPDF();
-      doc.setFontSize(24);
-      doc.setTextColor(30, 58, 95);
-      doc.text("BON DE LIVRAISON", 14, 25);
-      
-      if (companySettings) {
-        doc.setFontSize(12);
-        doc.setTextColor(30, 58, 95);
-        doc.text(companySettings.companyName || '', 140, 25);
-        doc.setFontSize(10);
-        doc.setTextColor(100, 116, 139);
-        doc.text(companySettings.address || '', 140, 32);
-        doc.text(`NIF/RC: ${companySettings.taxId || '-'}`, 140, 39);
-      }
+      printCompanyHeader(doc, "BON DE LIVRAISON", po);
 
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
-      doc.text(`BL N° : ${del.dnNumber}`, 14, 35);
-      doc.text(`BC Associé : ${po.poNumber}`, 14, 40);
-      doc.text(`Fournisseur : ${po.supplierName}`, 14, 45);
-      doc.text(`Date Réception : ${del.date}`, 14, 50);
-      doc.text(`Réceptionné par : ${del.receivedBy}`, 14, 55);
+      let leftY = 35;
+      doc.text(`BL N° : ${del.dnNumber}`, 14, leftY); leftY += 5;
+      doc.text(`BC Associé : ${po.poNumber}`, 14, leftY); leftY += 5;
+      doc.text(`Date Réception : ${del.date}`, 14, leftY); leftY += 5;
+      doc.text(`Réceptionné par : ${del.receivedBy}`, 14, leftY); leftY += 10;
+      
+      doc.setFontSize(11);
+      doc.setTextColor(19, 106, 168);
+      doc.text("Expéditeur :", 14, leftY); leftY += 5;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Fournisseur : ${po.supplierName}`, 14, leftY); leftY += 5;
+      if (supplier?.address) { doc.text(`Adresse: ${supplier.address}`, 14, leftY); leftY += 5; }
+      if (supplier?.nif) { doc.text(`NIF: ${supplier.nif}`, 14, leftY); leftY += 5; }
+      if (supplier?.nis) { doc.text(`NIS: ${supplier.nis}`, 14, leftY); leftY += 5; }
+      if (supplier?.rc) { doc.text(`RC: ${supplier.rc}`, 14, leftY); leftY += 5; }
+      if (supplier?.ai) { doc.text(`AI: ${supplier.ai}`, 14, leftY); leftY += 5; }
       
       const tableData = (del.items || []).map((item: any) => [
         item.sku, item.name, item.quantity_delivered || item.quantity, item.unit || 'pcs'
       ]);
 
+      const tableStartY = Math.max(leftY + 5, 80);
+
       autoTable(doc, {
         head: [['SKU', 'Produit', 'Qté Livrée', 'Unité']],
         body: tableData,
-        startY: 65,
+        startY: tableStartY,
         theme: 'grid',
         headStyles: { fillColor: [59, 130, 246], fontStyle: 'bold' },
         styles: { fontSize: 9 }
@@ -316,7 +404,7 @@ export default function PODetails() {
 
       const finalY = (doc as any).lastAutoTable?.finalY || 150;
       doc.setFontSize(10);
-      doc.setTextColor(30, 58, 95);
+      doc.setTextColor(19, 106, 168);
       doc.text("Visa Réception :", 14, finalY + 15);
       doc.text("___________________", 14, finalY + 25);
       
@@ -337,44 +425,54 @@ export default function PODetails() {
   const exportInvoicePDF = (inv: any) => {
     try {
       const doc = new jsPDF();
-      doc.setFontSize(24);
-      doc.setTextColor(30, 58, 95);
-      doc.text("FACTURE", 14, 25);
-      
-      if (companySettings) {
-        doc.setFontSize(12);
-        doc.setTextColor(30, 58, 95);
-        doc.text(companySettings.companyName || '', 140, 25);
-        doc.setFontSize(10);
-        doc.setTextColor(100, 116, 139);
-        doc.text(companySettings.address || '', 140, 32);
-        doc.text(`NIF/RC: ${companySettings.taxId || '-'}`, 140, 39);
-      }
+      printCompanyHeader(doc, "FACTURE", po);
 
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
-      doc.text(`Facture N° : ${inv.invNumber}`, 14, 35);
-      doc.text(`BC Associé : ${po.poNumber}`, 14, 40);
-      doc.text(`Fournisseur : ${po.supplierName}`, 14, 45);
-      doc.text(`Date : ${inv.date}`, 14, 50);
+      let leftY = 35;
+      doc.text(`Facture N° : ${inv.invNumber}`, 14, leftY); leftY += 5;
+      doc.text(`BC Associé : ${po.poNumber}`, 14, leftY); leftY += 5;
+      doc.text(`Date : ${inv.date}`, 14, leftY); leftY += 10;
+      
+      doc.setFontSize(11);
+      doc.setTextColor(19, 106, 168);
+      doc.text("Émetteur :", 14, leftY); leftY += 5;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Fournisseur : ${po.supplierName}`, 14, leftY); leftY += 5;
+      if (supplier?.address) { doc.text(`Adresse: ${supplier.address}`, 14, leftY); leftY += 5; }
+      if (supplier?.nif) { doc.text(`NIF: ${supplier.nif}`, 14, leftY); leftY += 5; }
+      if (supplier?.nis) { doc.text(`NIS: ${supplier.nis}`, 14, leftY); leftY += 5; }
+      if (supplier?.rc) { doc.text(`RC: ${supplier.rc}`, 14, leftY); leftY += 5; }
+      if (supplier?.ai) { doc.text(`AI: ${supplier.ai}`, 14, leftY); leftY += 5; }
+      if (supplier?.bankInfo) { doc.text(`Banque: ${supplier.bankInfo}`, 14, leftY); leftY += 5; }
       
       const tableData = po.items.map((item: any) => [
         item.sku, item.name, item.quantity, item.price?.toLocaleString(), (item.quantity * item.price)?.toLocaleString()
       ]);
 
+      const tableStartY = Math.max(leftY + 5, 80);
+
       autoTable(doc, {
         head: [['SKU', 'Produit', 'Qté', 'Prix Unit. (DZD)', 'Total']],
         body: tableData,
-        startY: 60,
+        startY: tableStartY,
         theme: 'grid',
-        headStyles: { fillColor: [30, 58, 95], fontStyle: 'bold' },
+        headStyles: { fillColor: [19, 106, 168], fontStyle: 'bold' },
         styles: { fontSize: 9 }
       });
 
       const finalY = (doc as any).lastAutoTable?.finalY || 150;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      if (po.tvaRate !== undefined) {
+        doc.text(`Total HT : ${po.totalHT?.toLocaleString()} DZD`, 196, finalY + 10, { align: 'right' });
+        doc.text(`TVA (${po.tvaRate}%) : ${po.tvaAmount?.toLocaleString()} DZD`, 196, finalY + 15, { align: 'right' });
+      }
       doc.setFontSize(14);
-      doc.setTextColor(30, 58, 95);
-      doc.text(`Montant Total : ${inv.totalAmount?.toLocaleString()} DZD`, 14, finalY + 15);
+      doc.setTextColor(19, 106, 168);
+      doc.text(`Montant Total TTC : ${inv.totalAmount?.toLocaleString()} DZD`, 196, finalY + (po.tvaRate !== undefined ? 25 : 15), { align: 'right' });
       
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
@@ -456,14 +554,14 @@ export default function PODetails() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-      <Loader2 className="w-10 h-10 animate-spin text-[#1E3A5F]" />
+      <Loader2 className="w-10 h-10 animate-spin text-[#136AA8]" />
     </div>
   );
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-10 space-y-10">
       <nav className="flex items-center justify-between">
-        <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-[#1E3A5F] transition-all font-bold uppercase text-xs tracking-widest">
+        <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-[#136AA8] transition-all font-bold uppercase text-xs tracking-widest">
           <ChevronLeft size={18} /> Retour au Tableau de bord
         </button>
         <div className="flex items-center gap-3">
@@ -481,7 +579,7 @@ export default function PODetails() {
             <button 
               key={s} 
               onClick={() => updateStatus(s)} 
-              className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${po.status === s ? 'bg-[#1E3A5F] text-white border-[#1E3A5F] shadow-md' : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'}`}
+              className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${po.status === s ? 'bg-[#136AA8] text-white border-[#136AA8] shadow-md' : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'}`}
             >
               {s === 'draft' ? 'Brouillon' : s === 'pending_approval' ? 'En Attente' : s === 'approved' ? 'Approuvé' : s === 'sent' ? 'Envoyé' : s === 'confirmed' ? 'Confirmé' : s === 'delivered' ? 'Livré' : 'Clôturé'}
             </button>
@@ -494,12 +592,12 @@ export default function PODetails() {
         <div className="lg:col-span-2 space-y-10">
           <section className="bg-white rounded-[2rem] p-10 border border-gray-100 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8">
-              <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-3 py-1 rounded-lg border border-blue-100 uppercase tracking-widest">{po.poNumber}</span>
+              <span className="text-[10px] font-black bg-blue-50 text-[#009CDA] px-3 py-1 rounded-lg border border-blue-100 uppercase tracking-widest">{po.poNumber}</span>
             </div>
             <div className="flex items-center gap-6 mb-10">
-              <div className="w-20 h-20 bg-blue-50 text-[#1E3A5F] rounded-3xl flex items-center justify-center border border-blue-100"><Building2 size={40} /></div>
+              <div className="w-20 h-20 bg-blue-50 text-[#136AA8] rounded-3xl flex items-center justify-center border border-blue-100"><Building2 size={40} /></div>
               <div>
-                <h1 className="text-2xl font-black text-[#1E3A5F] uppercase leading-none mb-2">{po.supplierName}</h1>
+                <h1 className="text-2xl font-black text-[#136AA8] uppercase leading-none mb-2">{po.supplierName}</h1>
                 <div className="flex items-center gap-4 text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
                   <span className="flex items-center gap-1.5"><Calendar size={14} /> {po.date}</span>
                   <span className="flex items-center gap-1.5"><User size={14} /> {po.buyerName}</span>
@@ -521,7 +619,7 @@ export default function PODetails() {
                   {po.items.map((item: any, i: number) => (
                     <tr key={i} className="text-sm font-bold text-gray-700">
                       <td className="py-5">
-                        <p className="text-[#1E3A5F] font-bold">{item.name}</p>
+                        <p className="text-[#136AA8] font-bold">{item.name}</p>
                         <p className="text-[10px] text-gray-400 uppercase tracking-tighter font-mono">{item.sku}</p>
                       </td>
                       <td className="py-5 text-center font-mono">{item.quantity} <span className="text-[10px] text-gray-400 font-sans">{item.unit}</span></td>
@@ -531,9 +629,21 @@ export default function PODetails() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="text-xl font-black text-[#1E3A5F]">
-                    <td colSpan={3} className="pt-8">Total de la Commande</td>
-                    <td className="pt-8 text-right font-mono decoration-blue-600/30 decoration-4 underline-offset-8 underline">{po.totalAmount?.toLocaleString()} <span className="text-xs font-sans text-gray-400">DZD</span></td>
+                  {po.tvaRate !== undefined && (
+                    <>
+                      <tr className="text-sm font-bold text-gray-500">
+                        <td colSpan={3} className="pt-6 text-right">Total HT</td>
+                        <td className="pt-6 text-right font-mono">{po.totalHT?.toLocaleString()}</td>
+                      </tr>
+                      <tr className="text-sm font-bold text-gray-500 border-b border-gray-100">
+                        <td colSpan={3} className="pb-4 text-right">TVA ({po.tvaRate}%)</td>
+                        <td className="pb-4 text-right font-mono">{po.tvaAmount?.toLocaleString()}</td>
+                      </tr>
+                    </>
+                  )}
+                  <tr className="text-xl font-black text-[#136AA8]">
+                    <td colSpan={3} className="pt-4 text-right">Total de la Commande {po.tvaRate !== undefined ? '(TTC)' : ''}</td>
+                    <td className="pt-4 text-right font-mono decoration-[#009CDA]/30 decoration-4 underline-offset-8 underline">{po.totalAmount?.toLocaleString()} <span className="text-xs font-sans text-gray-400">DZD</span></td>
                   </tr>
                 </tfoot>
               </table>
@@ -562,19 +672,19 @@ export default function PODetails() {
               )}
 
               {po.status === 'approved' && (
-                <button onClick={() => updateStatus('sent')} className="py-4 px-6 flex-1 bg-blue-500 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-100">
+                <button onClick={() => updateStatus('sent')} className="py-4 px-6 flex-1 bg-blue-500 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-[#009CDA] transition-all shadow-lg shadow-blue-100">
                   <Send size={18} /> Envoyer au Fournisseur
                 </button>
               )}
               
               {(po.status === 'sent' || po.status === 'approved' || po.status === 'delivered') && (
-                <button onClick={openDeliveryModal} className="py-4 px-6 flex-1 bg-[#3B82F6] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-100">
+                <button onClick={openDeliveryModal} className="py-4 px-6 flex-1 bg-[#3B82F6] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-[#009CDA] transition-all shadow-lg shadow-blue-100">
                   <Truck size={18} /> Enregistrer BL
                 </button>
               )}
               
               {(po.status === 'delivered' || po.status === 'sent') && (
-                <button onClick={openInvoiceModal} className="py-4 px-6 flex-1 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-slate-900 transition-all shadow-lg shadow-slate-100">
+                <button onClick={openInvoiceModal} className="py-4 px-6 flex-1 bg-[#136AA8] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-slate-900 transition-all shadow-lg shadow-slate-100">
                   <Receipt size={18} /> Enregistrer Facture
                 </button>
               )}
@@ -583,14 +693,14 @@ export default function PODetails() {
 
           {supplier && (
             <section className="bg-white rounded-[2rem] p-10 border border-gray-100 shadow-sm">
-              <h2 className="text-lg font-black uppercase text-[#1E3A5F] tracking-tight flex items-center gap-3 mb-8">
-                <Building2 size={22} className="text-blue-600" /> Détails du Fournisseur
+              <h2 className="text-lg font-black uppercase text-[#136AA8] tracking-tight flex items-center gap-3 mb-8">
+                <Building2 size={22} className="text-[#009CDA]" /> Détails du Fournisseur
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Désignation</label>
-                    <p className="text-sm font-bold text-[#1E3A5F] uppercase">{supplier.name}</p>
+                    <p className="text-sm font-bold text-[#136AA8] uppercase">{supplier.name}</p>
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Adresse</label>
@@ -610,11 +720,11 @@ export default function PODetails() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Contact Téléphonique</label>
-                    <p className="text-sm font-bold text-[#1E3A5F]">{supplier.phone || 'Non spécifié'}</p>
+                    <p className="text-sm font-bold text-[#136AA8]">{supplier.phone || 'Non spécifié'}</p>
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Email</label>
-                    <p className="text-sm font-bold text-blue-600">{supplier.email || 'Non spécifié'}</p>
+                    <p className="text-sm font-bold text-[#009CDA]">{supplier.email || 'Non spécifié'}</p>
                   </div>
                   <div className="pt-4">
                     <span className="text-[9px] font-black uppercase bg-emerald-50 text-emerald-600 px-2 py-1 rounded border border-emerald-100">Partenaire Approuvé</span>
@@ -625,8 +735,8 @@ export default function PODetails() {
           )}
 
           <section className="space-y-6">
-            <h2 className="text-lg font-black uppercase text-[#1E3A5F] tracking-tight flex items-center gap-3">
-              <History size={22} className="text-blue-600" /> Logistique & Réceptions (BL)
+            <h2 className="text-lg font-black uppercase text-[#136AA8] tracking-tight flex items-center gap-3">
+              <History size={22} className="text-[#009CDA]" /> Logistique & Réceptions (BL)
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {deliveries.length === 0 ? (
@@ -634,14 +744,14 @@ export default function PODetails() {
               ) : deliveries.map(d => (
                 <div key={d.id} className="bg-white p-6 rounded-[14px] border border-gray-200 shadow-sm hover:shadow-md transition-all group">
                    <div className="flex justify-between items-start mb-5">
-                     <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100"><Truck size={24} /></div>
+                     <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#009CDA] flex items-center justify-center border border-blue-100"><Truck size={24} /></div>
                      <div className="flex gap-2">
-                       <button onClick={() => exportDeliveryPDF(d)} className="text-gray-400 hover:text-blue-600 transition-all p-1.5 hover:bg-blue-50 rounded-lg" title="Exporter PDF"><Download size={16} /></button>
+                       <button onClick={() => exportDeliveryPDF(d)} className="text-gray-400 hover:text-[#009CDA] transition-all p-1.5 hover:bg-blue-50 rounded-lg" title="Exporter PDF"><Download size={16} /></button>
                        <button onClick={() => deleteDoc(doc(db, 'purchase_orders', id!, 'deliveries', d.id))} className="text-gray-200 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
                      </div>
                    </div>
                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1.5">Réception BL</p>
-                   <h3 className="text-lg font-bold text-[#1E3A5F] mb-4">{d.dnNumber}</h3>
+                   <h3 className="text-lg font-bold text-[#136AA8] mb-4">{d.dnNumber}</h3>
                    <div className="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
                      <span className="flex items-center gap-2"><Calendar size={14} /> {d.date || '—'}</span>
                      <span className="flex items-center gap-2"><User size={14} /> {d.receivedBy || '—'}</span>
@@ -652,8 +762,8 @@ export default function PODetails() {
           </section>
 
           <section className="space-y-6">
-            <h2 className="text-lg font-black uppercase text-[#1E3A5F] tracking-tight flex items-center gap-3">
-              <Receipt size={22} className="text-blue-600" /> Facturation Finale
+            <h2 className="text-lg font-black uppercase text-[#136AA8] tracking-tight flex items-center gap-3">
+              <Receipt size={22} className="text-[#009CDA]" /> Facturation Finale
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {invoices.length === 0 ? (
@@ -663,12 +773,12 @@ export default function PODetails() {
                    <div className="flex justify-between items-start mb-5">
                      <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100"><Receipt size={24} /></div>
                      <div className="flex gap-2">
-                       <button onClick={() => exportInvoicePDF(inv)} className="text-gray-400 hover:text-blue-600 transition-all p-1.5 hover:bg-blue-50 rounded-lg" title="Exporter PDF"><Download size={16} /></button>
+                       <button onClick={() => exportInvoicePDF(inv)} className="text-gray-400 hover:text-[#009CDA] transition-all p-1.5 hover:bg-blue-50 rounded-lg" title="Exporter PDF"><Download size={16} /></button>
                        <button onClick={() => deleteDoc(doc(db, 'purchase_orders', id!, 'invoices', inv.id))} className="text-gray-200 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
                      </div>
                    </div>
                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1.5">Facture Finale</p>
-                   <h3 className="text-lg font-bold text-[#1E3A5F] mb-4">{inv.invNumber}</h3>
+                   <h3 className="text-lg font-bold text-[#136AA8] mb-4">{inv.invNumber}</h3>
                    <div className="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
                      <span className="flex items-center gap-2"><Calendar size={14} /> {inv.date}</span>
                      <span className="flex items-center gap-2"><FileText size={14} /> {inv.totalAmount?.toLocaleString()} DZD</span>
@@ -682,19 +792,19 @@ export default function PODetails() {
         <div className="space-y-8">
           <section className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
              <div className="flex items-center justify-between mb-6">
-               <h3 className="text-lg font-black uppercase text-[#1E3A5F] flex items-center gap-2">
-                 <Clock size={20} className="text-blue-600" /> Tracking (Milestones)
+               <h3 className="text-lg font-black uppercase text-[#136AA8] flex items-center gap-2">
+                 <Clock size={20} className="text-[#009CDA]" /> Tracking (Milestones)
                </h3>
              </div>
 
              <div className="space-y-6 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
                {milestones.map((m, i) => (
                  <div key={`${m.id}-${i}`} className="relative pl-8">
-                    <div className={`absolute left-[3px] top-1.5 w-2 h-2 rounded-full border-2 border-white ring-4 ring-white ${m.color === 'emerald' ? 'bg-emerald-500' : m.color === 'blue' ? 'bg-blue-600' : m.color === 'indigo' ? 'bg-indigo-500' : 'bg-slate-800'}`} style={{ transform: 'translateX(-2.5px)' }} />
+                    <div className={`absolute left-[3px] top-1.5 w-2 h-2 rounded-full border-2 border-white ring-4 ring-white ${m.color === 'emerald' ? 'bg-emerald-500' : m.color === 'blue' ? 'bg-[#009CDA]' : m.color === 'indigo' ? 'bg-indigo-500' : 'bg-slate-800'}`} style={{ transform: 'translateX(-2.5px)' }} />
                     <p className="text-[10px] font-black uppercase text-gray-400 mb-1 leading-none">
                       {new Date(m.createdAt).toLocaleString()}
                     </p>
-                    <p className={`text-sm font-bold ${i === 0 ? 'text-[#1E3A5F]' : 'text-gray-900'}`}>{m.label}</p>
+                    <p className={`text-sm font-bold ${i === 0 ? 'text-[#136AA8]' : 'text-gray-900'}`}>{m.label}</p>
                     <p className="text-xs font-medium text-gray-500 mt-0.5">{m.details}</p>
                     <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest"><span className="opacity-50">Par</span> {m.userName}</p>
                  </div>
@@ -702,12 +812,12 @@ export default function PODetails() {
              </div>
            </section>
 
-           <section className="p-8 bg-[#1E3A5F] rounded-[2rem] text-white overflow-hidden relative">
+           <section className="p-8 bg-[#136AA8] rounded-[2rem] text-white overflow-hidden relative">
              <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full" />
              <div className="relative">
                <h3 className="text-lg font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-emerald-400"><CheckCircle2 size={20} /> Conformité</h3>
                <p className="text-xs font-medium text-white/60 leading-relaxed italic">Cette commande est soumise aux réglementations d'achat standard. Les Bons de Livraison doivent être archivés pour le rapprochement financier.</p>
-               <button className="mt-8 w-full py-4 border border-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-[#1E3A5F] transition-all">Guide d'Archivage</button>
+               <button className="mt-8 w-full py-4 border border-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-[#136AA8] transition-all">Guide d'Archivage</button>
              </div>
            </section>
         </div>
@@ -718,9 +828,9 @@ export default function PODetails() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-4xl h-[90vh] flex flex-col">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-black text-[#1E3A5F]">Aperçu du Document PDF</h3>
+                <h3 className="text-xl font-black text-[#136AA8]">Aperçu du Document PDF</h3>
                 <div className="flex items-center gap-3">
-                  <a href={pdfPreview} download="Document.pdf" className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-sm">Télécharger</a>
+                  <a href={pdfPreview} download="Document.pdf" className="px-4 py-2 bg-[#009CDA] text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-sm">Télécharger</a>
                   <button onClick={() => setPdfPreview(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
                     <X size={24} />
                   </button>
@@ -731,7 +841,7 @@ export default function PODetails() {
               </div>
               <div className="mt-4 flex justify-between items-center bg-blue-50 p-4 rounded-xl border border-blue-100">
                  <p className="text-xs font-bold text-blue-700">Le téléchargement automatique a peut-être été bloqué par votre navigateur.</p>
-                 <p className="text-xs font-medium text-blue-600">Vous pouvez imprimer ou télécharger le document directement depuis cet aperçu.</p>
+                 <p className="text-xs font-medium text-[#009CDA]">Vous pouvez imprimer ou télécharger le document directement depuis cet aperçu.</p>
               </div>
             </motion.div>
           </motion.div>
@@ -745,7 +855,7 @@ export default function PODetails() {
                 <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
                   <Trash2 size={32} />
                 </div>
-                <h3 className="text-xl font-black text-[#1E3A5F] mb-2">Supprimer la commande ?</h3>
+                <h3 className="text-xl font-black text-[#136AA8] mb-2">Supprimer la commande ?</h3>
                 <p className="text-sm text-gray-500 font-medium">
                   Êtes-vous sûr de vouloir supprimer le bon de commande <strong className="text-gray-900">{po.poNumber}</strong> ? Cette action est irréversible et supprimera également toutes les livraisons et factures associées.
                 </p>
@@ -773,7 +883,7 @@ export default function PODetails() {
         {deliveryModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md">
-              <h3 className="text-xl font-black text-[#1E3A5F] mb-4 flex items-center gap-2"><Truck className="text-blue-600" /> Enregistrer BL</h3>
+              <h3 className="text-xl font-black text-[#136AA8] mb-4 flex items-center gap-2"><Truck className="text-[#009CDA]" /> Enregistrer BL</h3>
               <form onSubmit={submitDelivery}>
                 <div className="mb-6">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Numéro du Bon de Livraison</label>
@@ -783,13 +893,13 @@ export default function PODetails() {
                     autoFocus
                     value={deliveryNumberInput} 
                     onChange={e => setDeliveryNumberInput(e.target.value)} 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#009CDA] focus:border-transparent transition-all outline-none" 
                     placeholder="Ex: BL-2023-001" 
                   />
                 </div>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setDeliveryModal(false)} className="flex-1 px-4 py-3 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all text-center">Annuler</button>
-                  <button type="submit" className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all text-center flex justify-center items-center gap-2">Confirmer <CheckCircle2 size={18} /></button>
+                  <button type="submit" className="flex-1 px-4 py-3 bg-[#009CDA] text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all text-center flex justify-center items-center gap-2">Confirmer <CheckCircle2 size={18} /></button>
                 </div>
               </form>
             </motion.div>
@@ -801,7 +911,7 @@ export default function PODetails() {
         {invoiceModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md">
-              <h3 className="text-xl font-black text-[#1E3A5F] mb-4 flex items-center gap-2"><Receipt className="text-blue-600" /> Enregistrer Facture</h3>
+              <h3 className="text-xl font-black text-[#136AA8] mb-4 flex items-center gap-2"><Receipt className="text-[#009CDA]" /> Enregistrer Facture</h3>
               <form onSubmit={submitInvoice}>
                 <div className="mb-6">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Numéro de la Facture Finale</label>
@@ -811,13 +921,13 @@ export default function PODetails() {
                     autoFocus
                     value={invoiceNumberInput} 
                     onChange={e => setInvoiceNumberInput(e.target.value)} 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#009CDA] focus:border-transparent transition-all outline-none" 
                     placeholder="Ex: FAC-2023-089" 
                   />
                 </div>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setInvoiceModal(false)} className="flex-1 px-4 py-3 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all text-center">Annuler</button>
-                  <button type="submit" className="flex-1 px-4 py-3 bg-[#1E3A5F] text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition-all text-center flex justify-center items-center gap-2">Confirmer <CheckCircle2 size={18} /></button>
+                  <button type="submit" className="flex-1 px-4 py-3 bg-[#136AA8] text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition-all text-center flex justify-center items-center gap-2">Confirmer <CheckCircle2 size={18} /></button>
                 </div>
               </form>
             </motion.div>

@@ -59,8 +59,8 @@ export default function ActivityLog() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-black text-[#1E3A5F] tracking-tight uppercase flex items-center gap-3">
-          <Clock className="text-blue-600" />
+        <h2 className="text-2xl font-black text-[#136AA8] tracking-tight uppercase flex items-center gap-3">
+          <Clock className="text-[#009CDA]" />
           Historique des Activités
         </h2>
         <p className="text-slate-500 font-medium mt-1">Traçabilité des ajouts récents (Produits, Fournisseurs, Commandes, Utilisateurs).</p>
@@ -92,7 +92,7 @@ export default function ActivityLog() {
                       {new Date(item.createdAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
                     </span>
                   </div>
-                  <h4 className="font-bold text-[#1E3A5F] text-sm">
+                  <h4 className="font-bold text-[#136AA8] text-sm">
                      {item.type === 'product' ? item.name : 
                       item.type === 'supplier' ? item.name : 
                       item.type === 'order' ? `BC: ${item.poNumber || 'N/A'}` : item.displayName}

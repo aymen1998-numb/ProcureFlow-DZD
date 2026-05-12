@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, addDoc, updateDoc, query, orderBy, deleteDoc, doc, where } from 'firebase/firestore';
-import { Plus, Search, Building2, MapPin, Phone, Mail, Trash2, Edit2, X, Loader2, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Building2, MapPin, Phone, Mail, Trash2, Edit2, X, Loader2, FileSpreadsheet, UploadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../hooks/useAuth';
@@ -14,7 +14,8 @@ export default function Suppliers() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ name: '', nif: '', rc: '', address: '', phone: '', email: '', bankInfo: '' });
+  const [formData, setFormData] = useState({ name: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -40,7 +41,7 @@ export default function Suppliers() {
   const openCreateModal = () => {
     setIsEditMode(false);
     setEditingSupplierId(null);
-    setFormData({ name: '', nif: '', rc: '', address: '', phone: '', email: '', bankInfo: '' });
+    setFormData({ name: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
     setIsModalOpen(true);
   };
 
@@ -50,7 +51,9 @@ export default function Suppliers() {
     setFormData({
       name: supplier.name || '',
       nif: supplier.nif || '',
+      nis: supplier.nis || '',
       rc: supplier.rc || '',
+      ai: supplier.ai || '',
       address: supplier.address || '',
       phone: supplier.phone || '',
       email: supplier.email || '',
@@ -80,7 +83,7 @@ export default function Suppliers() {
         });
       }
       setIsModalOpen(false);
-      setFormData({ name: '', nif: '', rc: '', address: '', phone: '', email: '', bankInfo: '' });
+      setFormData({ name: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Une erreur est survenue.");
@@ -106,27 +109,80 @@ export default function Suppliers() {
     XLSX.writeFile(workbook, "Liste_Fournisseurs.xlsx");
   };
 
+  const importFromExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoadingForm(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        for (const row of data as any[]) {
+          await addDoc(collection(db, 'suppliers'), {
+            name: String(row.name || row.Nom || row.Fournisseur || ''),
+            nif: String(row.nif || row.NIF || ''),
+            nis: String(row.nis || row.NIS || ''),
+            rc: String(row.rc || row.RC || ''),
+            ai: String(row.ai || row.AI || row['Article d\'Imposition'] || ''),
+            address: String(row.address || row.Adresse || ''),
+            phone: String(row.phone || row['Téléphone'] || row.Tel || ''),
+            email: String(row.email || row.Email || ''),
+            bankInfo: String(row.bankInfo || row.Banque || ''),
+            tenantId: tenantId,
+            createdAt: new Date().toISOString(),
+            createdBy: user?.displayName || user?.email || 'Importer'
+          });
+        }
+        alert('Import terminé avec succès!');
+      } catch (err: any) {
+        console.error(err);
+        alert('Erreur lors de l\'importation: ' + err.message);
+      } finally {
+        setLoadingForm(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const filtered = suppliers.filter(s => (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-[#1E3A5F] tracking-tight">Fournisseurs</h2>
+          <h2 className="text-2xl font-bold text-[#136AA8] tracking-tight">Fournisseurs</h2>
           <p className="text-sm text-gray-500 font-medium">Répertoire des partenaires commerciaux</p>
         </div>
         <div className="flex gap-3">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={importFromExcel} 
+            accept=".xlsx, .xls, .csv" 
+            className="hidden" 
+          />
           {suppliers.length === 0 && !loading && (
             <button onClick={seedFakeSuppliers} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 font-bold text-xs transition-all uppercase tracking-wide border border-emerald-100">
               Initialiser Démo
             </button>
           )}
-          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-[#1E3A5F] rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
+          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-[#136AA8] rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
+            <UploadCloud size={16} />
+            Importer Excel
+          </button>
+          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-[#136AA8] rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
             <FileSpreadsheet size={16} />
-            Excel
+            Exporter Excel
           </button>
           {role === 'admin' && (
-            <button onClick={openCreateModal} className="flex items-center gap-2 bg-[#3B82F6] text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-600 shadow-lg shadow-blue-100 transition-all text-xs uppercase tracking-widest">
+            <button onClick={openCreateModal} className="flex items-center gap-2 bg-[#3B82F6] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#009CDA] shadow-lg shadow-blue-100 transition-all text-xs uppercase tracking-widest">
               <Plus size={18} />
               Ajouter Fournisseur
             </button>
@@ -146,7 +202,7 @@ export default function Suppliers() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-600" /></div>
+        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#009CDA]" /></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map(s => (
@@ -158,9 +214,9 @@ export default function Suppliers() {
                 </div>
               )}
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 bg-slate-50 text-[#1E3A5F] rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-[#1E3A5F] group-hover:text-white transition-all duration-500"><Building2 size={24} /></div>
+                <div className="w-14 h-14 bg-slate-50 text-[#136AA8] rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-[#136AA8] group-hover:text-white transition-all duration-500"><Building2 size={24} /></div>
                 <div className="min-w-0 pr-10">
-                  <h3 className="text-lg font-black text-[#1E3A5F] leading-tight truncate uppercase">{s.name}</h3>
+                  <h3 className="text-lg font-black text-[#136AA8] leading-tight truncate uppercase">{s.name}</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Fournisseur Local</p>
                 </div>
               </div>
@@ -203,7 +259,7 @@ export default function Suppliers() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200">
-              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-[#1E3A5F] text-white">
+              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
                 <div>
                   <h3 className="text-xl font-black uppercase tracking-tight">{isEditMode ? 'Modifier Fournisseur' : 'Nouveau Fournisseur'}</h3>
                   <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest mt-1">Enregistrement partenaire</p>
@@ -218,7 +274,7 @@ export default function Suppliers() {
                 )}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nom de l'établissement</label>
-                  <input required placeholder="ex. SARL ALGER LOG" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#1E3A5F] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" />
+                  <input required placeholder="ex. SARL ALGER LOG" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
@@ -228,6 +284,16 @@ export default function Suppliers() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">RC</label>
                     <input placeholder="00B... (Registre)" value={formData.rc} onChange={e => setFormData({ ...formData, rc: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold focus:bg-white transition-all outline-none" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">NIS</label>
+                    <input placeholder="000... (Statistique)" value={formData.nis} onChange={e => setFormData({ ...formData, nis: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold focus:bg-white transition-all outline-none" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">AI</label>
+                    <input placeholder="000... (Article Imposition)" value={formData.ai} onChange={e => setFormData({ ...formData, ai: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold focus:bg-white transition-all outline-none" />
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -244,7 +310,7 @@ export default function Suppliers() {
                     <input type="email" placeholder="contact@fournisseur.dz" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:bg-white transition-all outline-none" />
                   </div>
                 </div>
-                <button type="submit" disabled={loadingForm} className="w-full py-5 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400">
+                <button type="submit" disabled={loadingForm} className="w-full py-5 bg-[#136AA8] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400">
                   {loadingForm ? 'Enregistrement...' : isEditMode ? 'Mettre à jour' : 'Inscrire le Fournisseur'}
                 </button>
               </form>

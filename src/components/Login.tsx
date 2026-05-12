@@ -49,10 +49,10 @@ export default function Login() {
         className="w-full max-w-md bg-white p-10 rounded-[2rem] shadow-2xl shadow-slate-200/50 border border-slate-100"
       >
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-[1.5rem] bg-[#1E3A5F] text-white shadow-xl mb-6 ring-8 ring-slate-50">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-[1.5rem] bg-[#136AA8] text-white shadow-xl mb-6 ring-8 ring-slate-50">
             <Package size={40} />
           </div>
-          <h1 className="text-4xl font-bold text-[#1E3A5F] tracking-tight mb-2">ProcuraFlow</h1>
+          <h1 className="text-4xl font-bold text-[#136AA8] tracking-tight mb-2">ProcuraFlow</h1>
           <p className="text-slate-500 font-medium">Système de Gestion d'Entrepôt et des Achats</p>
         </div>
 
@@ -62,7 +62,7 @@ export default function Login() {
               type="button"
               onClick={() => setIsLogin(true)}
               className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${
-                isLogin ? 'bg-white text-[#1E3A5F] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                isLogin ? 'bg-white text-[#136AA8] shadow-sm' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               Se connecter
@@ -71,7 +71,7 @@ export default function Login() {
               type="button"
               onClick={() => setIsLogin(false)}
               className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${
-                !isLogin ? 'bg-white text-[#1E3A5F] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                !isLogin ? 'bg-white text-[#136AA8] shadow-sm' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               Créer une équipe
@@ -80,7 +80,7 @@ export default function Login() {
 
           <div className="space-y-4">
             <div>
-               <label className="text-xs font-black uppercase tracking-widest text-[#1E3A5F] ml-1 mb-1 block">
+               <label className="text-xs font-black uppercase tracking-widest text-[#136AA8] ml-1 mb-1 block">
                  {isLogin ? 'Identifiant / Email' : 'Email de l\'admin'}
                </label>
                <input
@@ -93,7 +93,7 @@ export default function Login() {
                />
             </div>
             <div>
-               <label className="text-xs font-black uppercase tracking-widest text-[#1E3A5F] ml-1 mb-1 block">Mot de Passe</label>
+               <label className="text-xs font-black uppercase tracking-widest text-[#136AA8] ml-1 mb-1 block">Mot de Passe</label>
                <input
                  type="password"
                  required
@@ -114,7 +114,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-[#1E3A5F] text-white px-8 py-4 rounded-2xl font-bold hover:bg-[#152945] transition-all hover:shadow-lg hover:shadow-slate-200 active:scale-[0.98] disabled:opacity-50 mt-4"
+            className="w-full flex items-center justify-center gap-3 bg-[#136AA8] text-white px-8 py-4 rounded-2xl font-bold hover:bg-[#152945] transition-all hover:shadow-lg hover:shadow-slate-200 active:scale-[0.98] disabled:opacity-50 mt-4"
           >
             {loading ? (
               <Loader2 className="w-6 h-6 animate-spin" />
@@ -135,7 +135,7 @@ export default function Login() {
           href="https://www.linkedin.com/in/benouasser-aymen-chamssedine-93a806197?utm_source=share_via&utm_content=profile&utm_medium=member_android" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-xs text-[#1E3A5F] hover:text-blue-600 font-bold transition-colors"
+          className="inline-flex items-center gap-2 text-xs text-[#136AA8] hover:text-[#009CDA] font-bold transition-colors"
         >
           Benouasser Aymen Chamssedine
         </a>

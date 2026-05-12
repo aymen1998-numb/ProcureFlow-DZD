@@ -63,7 +63,7 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
             exit={{ opacity: 0, scale: 0.95, y: 20 }} 
             className="relative w-full max-w-lg bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200"
           >
-            <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-[#1E3A5F] text-white">
+            <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
               <div>
                 <h3 className="text-xl font-black uppercase tracking-tight">Nouveau Fournisseur</h3>
                 <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest mt-1">Enregistrement partenaire</p>
@@ -89,7 +89,7 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
                   placeholder="ex. SARL ALGER LOG" 
                   value={formData.name} 
                   onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#1E3A5F] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" 
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" 
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -145,7 +145,7 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
               <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full py-5 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400"
+                className="w-full py-5 bg-[#136AA8] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400"
               >
                 {loading ? 'Enregistrement...' : 'Inscrire le Fournisseur'}
               </button>

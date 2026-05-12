@@ -8,6 +8,7 @@ import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import PODetails from './components/PODetails';
+import TransferDetails from './components/TransferDetails';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
@@ -16,14 +17,14 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-        <Loader2 className="w-10 h-10 animate-spin text-[#1E3A5F]" />
+        <Loader2 className="w-10 h-10 animate-spin text-[#136AA8]" />
       </div>
     );
   }
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 text-gray-900">
+      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
         <Routes>
           <Route 
             path="/login" 
@@ -36,6 +37,10 @@ export default function App() {
           <Route 
             path="/purchase/:id" 
             element={user ? <PODetails /> : <Navigate to="/login" />} 
+          />
+          <Route 
+            path="/transfers/:id" 
+            element={user ? <TransferDetails /> : <Navigate to="/login" />} 
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

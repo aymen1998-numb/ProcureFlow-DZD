@@ -22,7 +22,8 @@ import {
   AlertTriangle,
   Menu,
   X,
-  Settings
+  Settings,
+  ArrowRightLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -48,10 +49,11 @@ interface PO {
 }
 
 import SettingsComponent from './Settings';
+import Transfers from './Transfers';
 
 export default function Dashboard() {
   const { user, role, tenantId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'suppliers' | 'products' | 'analytics' | 'history' | 'users' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'users' | 'settings'>('dashboard');
   const [pos, setPos] = useState<PO[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,10 +135,10 @@ export default function Dashboard() {
 
       {/* Sidebar - Matching HTML template style */}
       <aside className={`w-64 bg-white border-r border-gray-200 flex-col flex-shrink-0 h-screen shadow-sm z-50 transition-transform duration-300 fixed lg:sticky top-0 left-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex`}>
-        <div className="h-[58px] bg-[#1E3A5F] flex items-center justify-between px-5 gap-3 shadow-md">
+        <div className="h-[58px] bg-[#136AA8] flex items-center justify-between px-5 gap-3 shadow-md">
           <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-teal-400 rounded-lg flex items-center justify-center text-white font-mono font-bold text-xs">
-               PF
+             <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-teal-400 rounded-lg flex items-center justify-center text-white shadow-inner border border-white/20">
+               <Package size={18} strokeWidth={2.5} />
              </div>
              <span className="font-bold text-lg tracking-tight text-white uppercase italic">ProcuraFlow</span>
           </div>
@@ -149,32 +151,38 @@ export default function Dashboard() {
           <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Menu Principal</div>
           <button 
             onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
             <LayoutDashboard size={16} /> Tableau de Bord
           </button>
           <button 
+            onClick={() => { setActiveTab('transfers'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'transfers' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+          >
+            <ArrowRightLeft size={16} /> Transferts
+          </button>
+          <button 
             onClick={() => { setActiveTab('suppliers'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'suppliers' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'suppliers' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
             <Users size={16} /> Fournisseurs
           </button>
           <button 
             onClick={() => { setActiveTab('products'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'products' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'products' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
             <Box size={16} /> Stocks & Articles
           </button>
           <button 
             onClick={() => { setActiveTab('analytics'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'analytics' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'analytics' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
             <BarChart3 size={16} /> Analyses
           </button>
           
           <button 
             onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
             <Clock size={16} /> Historique
           </button>
@@ -186,13 +194,13 @@ export default function Dashboard() {
               </div>
               <button 
                 onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }}
-                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
               >
                 <Users size={16} /> Utilisateurs
               </button>
               <button 
                 onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
-                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'settings' ? 'bg-[#EFF6FF] text-[#1E3A5F] border-l-4 border-[#1E3A5F]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'settings' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
               >
                 <Settings size={16} /> Paramètres
               </button>
@@ -202,12 +210,12 @@ export default function Dashboard() {
 
         <div className="p-4 border-t border-gray-100 bg-[#F7F9FC]/50">
           <div className="flex items-center gap-3 mb-3 px-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 font-bold border border-blue-200">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-[#009CDA] font-bold border border-blue-200">
               {user?.displayName?.[0] || 'U'}
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold text-gray-900 truncate">{user?.displayName}</p>
-              <p className="text-[9px] text-blue-600 uppercase font-black tracking-tighter">{role}</p>
+              <p className="text-[9px] text-[#009CDA] uppercase font-black tracking-tighter">{role}</p>
             </div>
           </div>
           <button onClick={() => auth.signOut()} className="flex items-center gap-3 w-full p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-all font-bold text-[11px] uppercase tracking-wide">
@@ -218,7 +226,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-[58px] bg-[#1E3A5F] px-4 lg:px-8 flex items-center justify-between sticky top-0 z-30 shadow-lg">
+        <header className="h-[58px] bg-[#136AA8] px-4 lg:px-8 flex items-center justify-between sticky top-0 z-30 shadow-lg">
           <div className="flex items-center gap-4 flex-1 max-w-lg">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
@@ -254,7 +262,7 @@ export default function Dashboard() {
               <FileSpreadsheet size={14} />
               Exporter
             </button>
-            <button onClick={() => setIsModalOpen(true)} className="bg-[#3B82F6] hover:bg-blue-600 text-white px-3 lg:px-4 py-1.5 rounded-md font-bold flex items-center justify-center text-[10px] lg:text-[11px] transition-all shadow-md uppercase tracking-wide whitespace-nowrap">
+            <button onClick={() => setIsModalOpen(true)} className="bg-[#3B82F6] hover:bg-[#009CDA] text-white px-3 lg:px-4 py-1.5 rounded-md font-bold flex items-center justify-center text-[10px] lg:text-[11px] transition-all shadow-md uppercase tracking-wide whitespace-nowrap">
               <Plus size={14} className="sm:hidden" />
               <span className="hidden sm:inline">Nouveau Bon de Commande</span>
             </button>
@@ -267,7 +275,7 @@ export default function Dashboard() {
               <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold text-[#1E3A5F] tracking-tight">Tableau de Bord</h2>
+                    <h2 className="text-2xl font-bold text-[#136AA8] tracking-tight">Tableau de Bord</h2>
                     <p className="text-sm text-gray-500 font-medium">Surveillance des opérations d'achat locale</p>
                   </div>
                 </div>
@@ -280,7 +288,7 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">{s.label}</p>
-                        <p className="text-xl font-bold text-[#1E3A5F] font-mono tracking-tighter">{s.value}</p>
+                        <p className="text-xl font-bold text-[#136AA8] font-mono tracking-tighter">{s.value}</p>
                       </div>
                     </div>
                   ))}
@@ -295,14 +303,14 @@ export default function Dashboard() {
                           type="date"
                           value={dateStart}
                           onChange={(e) => setDateStart(e.target.value)}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-500 bg-transparent outline-none focus:text-[#1E3A5F]"
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-500 bg-transparent outline-none focus:text-[#136AA8]"
                         />
                         <span className="text-gray-300 font-bold block">-</span>
                         <input
                           type="date"
                           value={dateEnd}
                           onChange={(e) => setDateEnd(e.target.value)}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-500 bg-transparent outline-none focus:text-[#1E3A5F]"
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-500 bg-transparent outline-none focus:text-[#136AA8]"
                         />
                       </div>
                       <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
@@ -313,8 +321,8 @@ export default function Dashboard() {
                           onClick={() => setFilterStatus(status)}
                           className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border ${
                             filterStatus === status 
-                              ? 'bg-[#1E3A5F] text-white border-[#1E3A5F] shadow-md shadow-blue-100' 
-                              : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-blue-600'
+                              ? 'bg-[#136AA8] text-white border-[#136AA8] shadow-md shadow-blue-100' 
+                              : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-[#009CDA]'
                           }`}
                         >
                           {status === 'all' ? 'Tous' : getStatusLabel(status)}
@@ -325,13 +333,13 @@ export default function Dashboard() {
                   </div>
                   
                   {loading ? (
-                    <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-600" /></div>
+                    <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#009CDA]" /></div>
                   ) : pos.length === 0 ? (
                     <div className="bg-white rounded-2xl p-20 text-center border border-gray-200 shadow-sm">
                       <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
                         <Package size={28} className="text-gray-300" />
                       </div>
-                      <h3 className="text-lg font-bold text-[#1E3A5F] mb-1">Aucune commande active</h3>
+                      <h3 className="text-lg font-bold text-[#136AA8] mb-1">Aucune commande active</h3>
                       <p className="text-gray-400 text-sm max-w-xs mx-auto">Lancez votre flux d'approvisionnement en créant un nouveau bon de commande.</p>
                     </div>
                   ) : (
@@ -357,16 +365,16 @@ export default function Dashboard() {
                               <span className="text-[10px] font-mono font-bold bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-100 tracking-tighter">{p.poNumber}</span>
                               <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${getStatusStyle(p.status)}`}>{getStatusLabel(p.status)}</span>
                             </div>
-                            <h3 className="text-[15px] font-bold text-[#1E3A5F] mb-2 truncate group-hover:text-blue-600 transition-colors uppercase">{p.supplierName}</h3>
+                            <h3 className="text-[15px] font-bold text-[#136AA8] mb-2 truncate group-hover:text-[#009CDA] transition-colors uppercase">{p.supplierName}</h3>
                             <div className="flex items-center gap-2 mb-4">
-                              <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center text-[10px] font-bold text-blue-600">{p.buyerName?.[0]}</div>
+                              <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center text-[10px] font-bold text-[#009CDA]">{p.buyerName?.[0]}</div>
                               <span className="text-[11px] font-medium text-gray-500 tracking-tight">{p.buyerName}</span>
                             </div>
                           </div>
                           <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between rounded-b-[14px]">
                             <div>
                               <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest leading-none mb-1">Montant Total</p>
-                              <p className="text-lg font-black text-[#1E3A5F] font-mono leading-none tracking-tighter">{p.totalAmount?.toLocaleString()} <span className="text-[10px] text-gray-400">DZD</span></p>
+                              <p className="text-lg font-black text-[#136AA8] font-mono leading-none tracking-tighter">{p.totalAmount?.toLocaleString()} <span className="text-[10px] text-gray-400">DZD</span></p>
                             </div>
                             <div className="text-right">
                               <p className="text-[10px] font-bold text-gray-400 flex items-center gap-1 justify-end"><Clock size={10} /> {new Date(p.createdAt).toLocaleDateString()}</p>
@@ -380,6 +388,7 @@ export default function Dashboard() {
               </motion.div>
             )}
 
+            {activeTab === 'transfers' && <motion.div key="transfers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Transfers /></motion.div>}
             {activeTab === 'suppliers' && <motion.div key="suppliers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Suppliers /></motion.div>}
             {activeTab === 'products' && <motion.div key="products" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Products /></motion.div>}
             {activeTab === 'analytics' && <motion.div key="analytics" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><Analytics /></motion.div>}

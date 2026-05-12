@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, addDoc, query, orderBy, deleteDoc, doc, updateDoc, where } from 'firebase/firestore';
-import { Plus, Search, Package, Trash2, X, Loader2, FileSpreadsheet, Tag, AlertTriangle, Edit3, ArrowRightLeft } from 'lucide-react';
+import { Plus, Search, Package, Trash2, X, Loader2, FileSpreadsheet, Tag, AlertTriangle, Edit3, ArrowRightLeft, UploadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../hooks/useAuth';
@@ -13,6 +13,7 @@ export default function Products() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ name: '', sku: '', category: '', unit: 'pcs', defaultPrice: 0, stockQuantity: 0, minStock: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Stock Adjustment State
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
@@ -90,6 +91,47 @@ export default function Products() {
     XLSX.writeFile(workbook, "Catalogue_Articles.xlsx");
   };
 
+  const importFromExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoadingForm(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        for (const row of data as any[]) {
+          // Expected columns: sku, name, category, unit, defaultPrice, stockQuantity, minStock (Fallback to empty/0)
+          await addDoc(collection(db, 'products'), {
+            sku: String(row.sku || row.SKU || row['Référence'] || ''),
+            name: String(row.name || row.Désignation || row.Nom || ''),
+            category: String(row.category || row.Catégorie || ''),
+            unit: String(row.unit || row['Unité'] || 'pcs'),
+            defaultPrice: Number(row.defaultPrice || row['Prix Unit.'] || row.Prix || 0),
+            stockQuantity: Number(row.stockQuantity || row.Stock || row['En Stock'] || 0),
+            minStock: Number(row.minStock || row.Seuil || 0),
+            tenantId: tenantId,
+            createdAt: new Date().toISOString(),
+            createdBy: user?.displayName || user?.email || 'Importer'
+          });
+        }
+        alert('Import terminé avec succès!');
+      } catch (err: any) {
+        console.error(err);
+        alert('Erreur lors de l\'importation: ' + err.message);
+      } finally {
+        setLoadingForm(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const filtered = products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase()));
   const alertProducts = products.filter(p => (p.stockQuantity || 0) <= (p.minStock || 0));
 
@@ -97,15 +139,26 @@ export default function Products() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-[#1E3A5F] tracking-tight">Catalogue Produits</h2>
+          <h2 className="text-2xl font-bold text-[#136AA8] tracking-tight">Catalogue Produits</h2>
           <p className="text-sm text-gray-500 font-medium">Gestion des articles et nomenclatures</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-[#1E3A5F] rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
-            <FileSpreadsheet size={16} />
-            Excel
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={importFromExcel} 
+            accept=".xlsx, .xls, .csv" 
+            className="hidden" 
+          />
+          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-[#136AA8] rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
+            <UploadCloud size={16} />
+            Importer Excel
           </button>
-          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#3B82F6] text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-600 shadow-lg shadow-blue-100 transition-all text-xs uppercase tracking-widest">
+          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-[#136AA8] rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
+            <FileSpreadsheet size={16} />
+            Exporter Excel
+          </button>
+          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#3B82F6] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#009CDA] shadow-lg shadow-blue-100 transition-all text-xs uppercase tracking-widest">
             <Plus size={18} />
             Ajouter Produit
           </button>
@@ -144,13 +197,13 @@ export default function Products() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-600" /></div>
+        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#009CDA]" /></div>
       ) : (
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-[#1E3A5F] text-white text-[10px] uppercase font-black tracking-[0.2em]">
+                <tr className="bg-[#136AA8] text-white text-[10px] uppercase font-black tracking-[0.2em]">
                   <th className="px-5 py-5">SKU / Réf</th>
                   <th className="px-5 py-5">Désignation</th>
                   <th className="px-5 py-5">Catégorie</th>
@@ -166,7 +219,7 @@ export default function Products() {
                 {filtered.map(p => (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-5 py-5 font-mono text-xs font-bold text-slate-400 tracking-tighter uppercase">{p.sku}</td>
-                    <td className="px-5 py-5 font-bold text-[#1E3A5F] uppercase text-sm">{p.name}</td>
+                    <td className="px-5 py-5 font-bold text-[#136AA8] uppercase text-sm">{p.name}</td>
                     <td className="px-5 py-5">
                       <span className="px-3 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest border border-slate-200">
                         {p.category || 'N/A'}
@@ -183,7 +236,7 @@ export default function Products() {
                     <td className="px-5 py-5 text-center">
                       <span className="text-[11px] font-bold text-slate-400 uppercase">{p.unit}</span>
                     </td>
-                    <td className="px-5 py-5 font-black text-right text-[#1E3A5F] font-mono whitespace-nowrap text-xs">
+                    <td className="px-5 py-5 font-black text-right text-[#136AA8] font-mono whitespace-nowrap text-xs">
                       {p.defaultPrice?.toLocaleString()}
                     </td>
                     <td className="px-5 py-5 text-center">
@@ -202,7 +255,7 @@ export default function Products() {
                           setAdjustData({ quantity: 0, type: 'add', note: '' });
                           setIsAdjustModalOpen(true);
                         }}
-                        className="p-2 bg-blue-50 text-blue-600 rounded-lg transition-all hover:bg-blue-100 opacity-0 group-hover:opacity-100"
+                        className="p-2 bg-blue-50 text-[#009CDA] rounded-lg transition-all hover:bg-blue-100 opacity-0 group-hover:opacity-100"
                         title="Ajuster le Stock"
                       >
                         <ArrowRightLeft size={16} />
@@ -225,7 +278,7 @@ export default function Products() {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdjustModalOpen(false)} className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-sm bg-white rounded-[2rem] overflow-hidden shadow-2xl border border-slate-200">
-              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-[#1E3A5F] text-white">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
                 <div>
                   <h3 className="text-lg font-black uppercase tracking-tight">Ajustement Stock</h3>
                   <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest mt-1">{selectedProduct.name}</p>
@@ -246,7 +299,7 @@ export default function Products() {
                       onClick={() => setAdjustData({ ...adjustData, type: t as any })}
                       className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
                         adjustData.type === t 
-                          ? t === 'set' ? 'bg-[#1E3A5F] text-white shadow-sm' : t === 'remove' ? 'bg-red-500 text-white shadow-sm' : 'bg-emerald-500 text-white shadow-sm'
+                          ? t === 'set' ? 'bg-[#136AA8] text-white shadow-sm' : t === 'remove' ? 'bg-red-500 text-white shadow-sm' : 'bg-emerald-500 text-white shadow-sm'
                           : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
                       }`}
                     >
@@ -261,7 +314,7 @@ export default function Products() {
                 </div>
                 
                 <button type="submit" disabled={loadingForm} className={`w-full py-4 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all shadow-xl active:scale-95 mt-2 disabled:bg-slate-400 disabled:shadow-none ${
-                  adjustData.type === 'remove' ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : adjustData.type === 'set' ? 'bg-[#1E3A5F] hover:bg-slate-900 shadow-slate-200' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200'
+                  adjustData.type === 'remove' ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : adjustData.type === 'set' ? 'bg-[#136AA8] hover:bg-slate-900 shadow-slate-200' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200'
                 }`}>
                   {loadingForm ? 'Mise à jour en cours...' : 'Valider l\'ajustement'}
                 </button>
@@ -277,7 +330,7 @@ export default function Products() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200">
-              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-[#1E3A5F] text-white">
+              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
                 <div>
                   <h3 className="text-xl font-black uppercase tracking-tight">Nouveau Produit</h3>
                   <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest mt-1">Nomenclature technique</p>
@@ -302,7 +355,7 @@ export default function Products() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Désignation de l'article</label>
-                  <input required placeholder="Nom complet de l'article" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#1E3A5F] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" />
+                  <input required placeholder="Nom complet de l'article" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
@@ -331,7 +384,7 @@ export default function Products() {
                     <input type="number" placeholder="0" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: Number(e.target.value) })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold focus:bg-white transition-all" />
                   </div>
                 </div>
-                <button type="submit" disabled={loadingForm} className="w-full py-5 bg-[#1E3A5F] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400">
+                <button type="submit" disabled={loadingForm} className="w-full py-5 bg-[#136AA8] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400">
                   {loadingForm ? 'Enregistrement en cours...' : 'Inscrire au Catalogue'}
                 </button>
               </form>

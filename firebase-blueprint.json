@@ -90,6 +90,22 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["status", "userId", "createdAt"]
+    },
+    "Transfer": {
+      "title": "Transfer",
+      "description": "Inventory transfer between locations",
+      "type": "object",
+      "properties": {
+        "transferNumber": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "sourceLocation": { "type": "string" },
+        "destLocation": { "type": "string" },
+        "status": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "items": { "type": "array" }
+      },
+      "required": ["transferNumber", "tenantId", "sourceLocation", "destLocation", "status"]
     }
   },
   "firestore": {
@@ -116,6 +132,10 @@
     "/purchase_orders/{poId}/status_history/{historyId}": {
       "schema": "StatusHistory",
       "description": "Audit trail entries"
+    },
+    "/transfers/{transferId}": {
+      "schema": "Transfer",
+      "description": "Inventory transfer orders"
     }
   }
 }
