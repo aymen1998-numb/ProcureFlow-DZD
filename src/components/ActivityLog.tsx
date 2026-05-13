@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 import { motion } from 'motion/react';
-import { Clock, Package, Building2, Users as UsersIcon, FileText } from 'lucide-react';
+import { Clock, Package, Building2, Users as UsersIcon, FileText, Coins } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function ActivityLog() {
@@ -13,35 +13,66 @@ export default function ActivityLog() {
   useEffect(() => {
     if (!tenantId) return;
     // Fetch from all collections and merge
-    const unsubProducts = onSnapshot(query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), (snap) => {
-      const prods = snap.docs.map(d => ({ ...d.data(), id: d.id, type: 'product' }));
-      updateActivities(prods, 'product');
-    });
+    const unsubProducts = onSnapshot(
+      query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), 
+      (snap) => {
+        const prods = snap.docs.map(d => ({ ...d.data(), id: d.id, type: 'product' }));
+        updateActivities(prods, 'product');
+      },
+      (error) => console.error('Products listener error:', error)
+    );
 
-    const unsubSuppliers = onSnapshot(query(collection(db, 'suppliers'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), (snap) => {
-      const sups = snap.docs.map(d => ({ ...d.data(), id: d.id, type: 'supplier' }));
-      updateActivities(sups, 'supplier');
-    });
+    const unsubSuppliers = onSnapshot(
+      query(collection(db, 'suppliers'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), 
+      (snap) => {
+        const sups = snap.docs.map(d => ({ ...d.data(), id: d.id, type: 'supplier' }));
+        updateActivities(sups, 'supplier');
+      },
+      (error) => console.error('Suppliers listener error:', error)
+    );
 
-    const unsubOrders = onSnapshot(query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), (snap) => {
-      const pos = snap.docs.map(d => ({ ...d.data(), id: d.id, type: 'order' }));
-      updateActivities(pos, 'order');
-    });
+    const unsubOrders = onSnapshot(
+      query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), 
+      (snap) => {
+        const pos = snap.docs.map(d => ({ ...d.data(), id: d.id, type: 'order' }));
+        updateActivities(pos, 'order');
+      },
+      (error) => console.error('Orders listener error:', error)
+    );
 
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), (snap) => {
-      const usrs = snap.docs.map(d => ({ ...d.data(), id: d.id, type: 'user' }));
-      updateActivities(usrs, 'user');
-    });
+    const unsubCash = onSnapshot(
+      query(collection(db, 'cash_requests'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), 
+      (snap) => {
+        const cashReqs = snap.docs.map(d => ({ 
+          ...d.data(), 
+          id: d.id, 
+          type: 'cash',
+          createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate().toISOString() : new Date().toISOString()
+        }));
+        updateActivities(cashReqs, 'cash');
+      },
+      (error) => console.error('Cash Requests listener error:', error)
+    );
+
+    const unsubUsers = onSnapshot(
+      query(collection(db, 'users'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), 
+      (snap) => {
+        const usrs = snap.docs.map(d => ({ ...d.data(), id: d.id, type: 'user' }));
+        updateActivities(usrs, 'user');
+      },
+      (error) => console.error('Users listener error:', error)
+    );
 
     return () => {
       unsubProducts();
       unsubSuppliers();
       unsubOrders();
+      unsubCash();
       unsubUsers();
     };
   }, [tenantId]);
 
-  const [cache, setCache] = useState<Record<string, any[]>>({ product: [], supplier: [], order: [], user: [] });
+  const [cache, setCache] = useState<Record<string, any[]>>({ product: [], supplier: [], order: [], cash: [], user: [] });
 
   const updateActivities = (newItems: any[], type: string) => {
     setCache(prev => {
@@ -63,7 +94,7 @@ export default function ActivityLog() {
           <Clock className="text-[#009CDA]" />
           Historique des Activités
         </h2>
-        <p className="text-slate-500 font-medium mt-1">Traçabilité des ajouts récents (Produits, Fournisseurs, Commandes, Utilisateurs).</p>
+        <p className="text-slate-500 font-medium mt-1">Traçabilité des ajouts récents (Produits, Fournisseurs, Commandes, Utilisateurs, Demandes de Caisse).</p>
       </div>
 
       <div className="bg-white rounded-[2rem] border border-slate-100 p-6 shadow-sm">
@@ -75,6 +106,7 @@ export default function ActivityLog() {
                  {item.type === 'supplier' && <Building2 size={16} className="text-emerald-500" />}
                  {item.type === 'order' && <FileText size={16} className="text-indigo-500" />}
                  {item.type === 'user' && <UsersIcon size={16} className="text-orange-500" />}
+                 {item.type === 'cash' && <Coins size={16} className="text-amber-500" />}
                </div>
 
                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
@@ -82,11 +114,13 @@ export default function ActivityLog() {
                     <span className={`text-[10px] font-black uppercase tracking-widest ${
                       item.type === 'product' ? 'text-blue-500' : 
                       item.type === 'supplier' ? 'text-emerald-500' : 
-                      item.type === 'order' ? 'text-indigo-500' : 'text-orange-500'
+                      item.type === 'order' ? 'text-indigo-500' : 
+                      item.type === 'cash' ? 'text-amber-500' : 'text-orange-500'
                     }`}>
                       {item.type === 'product' ? 'Nouveau Produit' : 
                        item.type === 'supplier' ? 'Nouveau Fournisseur' : 
-                       item.type === 'order' ? 'Nouvelle Commande' : 'Nouvel Utilisateur'}
+                       item.type === 'order' ? 'Nouvelle Commande' : 
+                       item.type === 'cash' ? 'Demande de Caisse' : 'Nouvel Utilisateur'}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400">
                       {new Date(item.createdAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
@@ -95,10 +129,11 @@ export default function ActivityLog() {
                   <h4 className="font-bold text-[#136AA8] text-sm">
                      {item.type === 'product' ? item.name : 
                       item.type === 'supplier' ? item.name : 
-                      item.type === 'order' ? `BC: ${item.poNumber || 'N/A'}` : item.displayName}
+                      item.type === 'order' ? `BC: ${item.poNumber || 'N/A'}` : 
+                      item.type === 'cash' ? `Montant: ${item.amount} DA` : item.displayName}
                   </h4>
                   <p className="text-xs text-slate-500 mt-1">
-                     Ajouté par : <span className="font-bold text-slate-700">{item.createdBy || item.buyerName || 'Administrateur'}</span>
+                     {item.type === 'cash' ? 'Demandé par :' : 'Ajouté par :'} <span className="font-bold text-slate-700">{item.createdBy || item.buyerName || item.requesterName || 'Administrateur'}</span>
                   </p>
                </div>
              </motion.div>

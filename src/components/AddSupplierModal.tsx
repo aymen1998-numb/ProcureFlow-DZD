@@ -63,7 +63,7 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
             exit={{ opacity: 0, scale: 0.95, y: 20 }} 
             className="relative w-full max-w-lg bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200"
           >
-            <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
+            <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
               <div>
                 <h3 className="text-xl font-black uppercase tracking-tight">Nouveau Fournisseur</h3>
                 <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest mt-1">Enregistrement partenaire</p>
@@ -76,7 +76,7 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-10 space-y-6">
+            <form onSubmit={handleSubmit} className="p-6 sm:p-10 space-y-6">
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium">
                   {error}

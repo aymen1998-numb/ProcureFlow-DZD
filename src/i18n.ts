@@ -6,6 +6,7 @@ const resources = {
     translation: {
       "dashboard": "Tableau de Bord",
       "da": "Demandes d'Achat",
+      "cash_requests": "Bon de Caisse (بيان صرف)",
       "transfers": "Transferts et Mouvements",
       "suppliers": "Fournisseurs",
       "products": "Catalogue des Articles",
@@ -22,6 +23,7 @@ const resources = {
     translation: {
       "dashboard": "لوحة القيادة",
       "da": "طلبات الشراء",
+      "cash_requests": "بيان صرف",
       "transfers": "التحويلات والحركات",
       "suppliers": "الموردين",
       "products": "كتالوج العناصر",

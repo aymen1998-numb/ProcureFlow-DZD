@@ -46,7 +46,7 @@ export default function Login() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-white p-10 rounded-[2rem] shadow-2xl shadow-slate-200/50 border border-slate-100"
+        className="w-full max-w-md bg-white p-6 sm:p-10 rounded-[2rem] shadow-2xl shadow-slate-200/50 border border-slate-100"
       >
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-[1.5rem] bg-[#136AA8] text-white shadow-xl mb-6 ring-8 ring-slate-50">

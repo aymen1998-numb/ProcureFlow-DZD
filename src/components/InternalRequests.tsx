@@ -217,7 +217,7 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
                   <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><Trash2 className="hidden" /><X size={18} /></button>
                 </div>
                 <form onSubmit={handleCreateDA} className="flex flex-col flex-1 overflow-hidden">
-                  <div className="p-8 overflow-y-auto flex-1 space-y-6">
+                  <div className="p-4 sm:p-8 overflow-y-auto flex-1 space-y-6">
                     
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">

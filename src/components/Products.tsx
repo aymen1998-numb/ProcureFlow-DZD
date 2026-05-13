@@ -285,7 +285,7 @@ export default function Products() {
                 </div>
                 <button onClick={() => setIsAdjustModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={18} /></button>
               </div>
-              <form onSubmit={handleAdjustStock} className="p-8 space-y-5">
+              <form onSubmit={handleAdjustStock} className="p-4 sm:p-8 space-y-5">
                 {error && (
                   <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium">
                     {error}

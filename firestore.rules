@@ -72,6 +72,12 @@ service cloud.firestore {
       }
     }
 
+    match /cash_requests/{reqId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+    }
+
     match /transfers/{transferId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();

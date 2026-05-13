@@ -20,6 +20,7 @@ export default function Users() {
   
   const [formData, setFormData] = useState({
     username: '',
+    fullName: '',
     password: '',
     role: 'buyer',
     unitId: ''
@@ -61,7 +62,7 @@ export default function Users() {
     setIsEditMode(false);
     setEditingUserId(null);
     setSelectedUser(null);
-    setFormData({ username: '', password: '', role: 'buyer', unitId: '' });
+    setFormData({ username: '', fullName: '', password: '', role: 'buyer', unitId: '' });
     setError(null);
     setIsModalOpen(true);
   };
@@ -70,7 +71,7 @@ export default function Users() {
     setIsEditMode(true);
     setEditingUserId(user.id);
     setSelectedUser(user);
-    setFormData({ username: user.displayName, password: '', role: user.role, unitId: user.unitId || '' });
+    setFormData({ username: user.displayName, fullName: user.fullName || '', password: '', role: user.role, unitId: user.unitId || '' });
     setError(null);
     setIsModalOpen(true);
   };
@@ -91,7 +92,7 @@ export default function Users() {
     try {
       if (isEditMode && editingUserId) {
          const { updateDoc } = await import('firebase/firestore');
-         const updateData: any = { role: formData.role };
+         const updateData: any = { role: formData.role, fullName: formData.fullName, displayName: formData.username };
          if (formData.role === 'magasinier') {
            updateData.unitId = formData.unitId;
          } else {
@@ -105,12 +106,13 @@ export default function Users() {
         const email = formData.username.includes('@') ? formData.username : `${formData.username}@pms.local`;
         
         const { user } = await createUserWithEmailAndPassword(secondaryAuth, email, formData.password);
-        await updateProfile(user, { displayName: formData.username });
+        await updateProfile(user, { displayName: formData.fullName || formData.username });
         
         const userData: any = {
           uid: user.uid,
           email: email,
           displayName: formData.username,
+          fullName: formData.fullName,
           role: formData.role,
           tenantId: tenantId,
           createdAt: new Date().toISOString(),
@@ -127,7 +129,7 @@ export default function Users() {
       }
       
       setIsModalOpen(false);
-      setFormData({ username: '', password: '', role: 'buyer', unitId: '' });
+      setFormData({ username: '', fullName: '', password: '', role: 'buyer', unitId: '' });
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
@@ -177,8 +179,8 @@ export default function Users() {
                 {user.displayName?.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-[#136AA8] text-lg">{user.displayName}</h3>
-                <p className="text-xs text-slate-400 mb-1 truncate">{user.email}</p>
+                <h3 className="font-bold text-[#136AA8] text-lg">{user.fullName || user.displayName}</h3>
+                <p className="text-xs text-slate-400 mb-1 truncate">{user.email}{user.fullName ? ` (${user.displayName})` : ''}</p>
                 <p className="text-[10px] text-slate-400 font-medium">Créé le : {user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-FR') : 'Date inconnue'}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <select
@@ -216,11 +218,15 @@ export default function Users() {
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={18} /></button>
               </div>
-              <form onSubmit={handleCreateUser} className="p-8 space-y-5">
+              <form onSubmit={handleCreateUser} className="p-4 sm:p-8 space-y-5">
                 <div className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Identifiant</label>
                     <input type="text" required={!isEditMode} disabled={isEditMode} value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className={`w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:bg-white transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200 ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="mod1" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nom Complet (Optionnel)</label>
+                    <input type="text" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:bg-white transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200" placeholder="Jean Dupont" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">{isEditMode ? 'Nouveau Mot De Passe (optionnel)' : 'Mot De Passe'}</label>

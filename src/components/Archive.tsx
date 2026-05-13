@@ -19,45 +19,48 @@ export default function Archive() {
     let unsubDa: any;
     let unsubPo: any;
 
-    try {
-      const qDa = query(collection(db, 'purchase_requests'), where('tenantId', '==', tenantId), where('status', 'in', ['archived', 'cancelled', 'done']));
-      unsubDa = onSnapshot(qDa, (snap) => {
-        const daList = snap.docs.map(d => ({ id: d.id, type: 'DA', ...d.data() }));
-        setItems(prev => {
-          const removedOthers = prev.filter(p => p.type !== 'DA');
-          return [...removedOthers, ...daList].sort((a,b) => b.createdAt?.localeCompare(a.createdAt));
-        });
+    const fallback = () => {
+      if (unsubDa) unsubDa();
+      if (unsubPo) unsubPo();
+
+      const fallbackDa = query(collection(db, 'purchase_requests'), where('tenantId', '==', tenantId));
+      unsubDa = onSnapshot(fallbackDa, snap => {
+        const list = snap.docs.map(d => ({ id: d.id, type: 'DA', ...d.data() })).filter((d: any) => ['archived', 'cancelled', 'done'].includes(d.status));
+        setItems(prev => [...prev.filter(p => p.type !== 'DA'), ...list].sort((a,b) => b.createdAt?.localeCompare(a.createdAt)));
       });
 
-      const qPo = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), where('status', 'in', ['archived', 'cancelled', 'done']));
-      unsubPo = onSnapshot(qPo, (snap) => {
-        const poList = snap.docs.map(d => ({ id: d.id, type: 'PO', ...d.data() }));
-        setItems(prev => {
-          const removedOthers = prev.filter(p => p.type !== 'PO');
-          return [...removedOthers, ...poList].sort((a,b) => b.createdAt?.localeCompare(a.createdAt));
-        });
+      const fallbackPo = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId));
+      unsubPo = onSnapshot(fallbackPo, snap => {
+        const list = snap.docs.map(d => ({ id: d.id, type: 'PO', ...d.data() })).filter((d: any) => ['archived', 'cancelled', 'done'].includes(d.status));
+        setItems(prev => [...prev.filter(p => p.type !== 'PO'), ...list].sort((a,b) => b.createdAt?.localeCompare(a.createdAt)));
         setLoading(false);
       });
-      
-    } catch (e) {
-      console.error(e);
-      // Fallback
-      if (!unsubDa) {
-        const fallbackDa = query(collection(db, 'purchase_requests'), where('tenantId', '==', tenantId));
-        unsubDa = onSnapshot(fallbackDa, snap => {
-          const list = snap.docs.map(d => ({ id: d.id, type: 'DA', ...d.data() })).filter((d: any) => ['archived', 'cancelled', 'done'].includes(d.status));
-          setItems(prev => [...prev.filter(p => p.type !== 'DA'), ...list]);
-        });
-      }
-      if (!unsubPo) {
-        const fallbackPo = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId));
-        unsubPo = onSnapshot(fallbackPo, snap => {
-          const list = snap.docs.map(d => ({ id: d.id, type: 'PO', ...d.data() })).filter((d: any) => ['archived', 'cancelled', 'done'].includes(d.status));
-          setItems(prev => [...prev.filter(p => p.type !== 'PO'), ...list]);
-          setLoading(false);
-        });
-      }
-    }
+    };
+
+    const qDa = query(collection(db, 'purchase_requests'), where('tenantId', '==', tenantId), where('status', 'in', ['archived', 'cancelled', 'done']));
+    unsubDa = onSnapshot(qDa, (snap) => {
+      const daList = snap.docs.map(d => ({ id: d.id, type: 'DA', ...d.data() }));
+      setItems(prev => {
+        const removedOthers = prev.filter(p => p.type !== 'DA');
+        return [...removedOthers, ...daList].sort((a,b) => b.createdAt?.localeCompare(a.createdAt));
+      });
+    }, (error) => {
+      console.error(error);
+      fallback();
+    });
+
+    const qPo = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), where('status', 'in', ['archived', 'cancelled', 'done']));
+    unsubPo = onSnapshot(qPo, (snap) => {
+      const poList = snap.docs.map(d => ({ id: d.id, type: 'PO', ...d.data() }));
+      setItems(prev => {
+        const removedOthers = prev.filter(p => p.type !== 'PO');
+        return [...removedOthers, ...poList].sort((a,b) => b.createdAt?.localeCompare(a.createdAt));
+      });
+      setLoading(false);
+    }, (error) => {
+      console.error(error);
+      fallback();
+    });
 
     return () => {
       if (typeof unsubDa === 'function') unsubDa();

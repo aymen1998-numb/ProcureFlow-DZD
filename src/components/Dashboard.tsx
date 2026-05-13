@@ -26,7 +26,8 @@ import {
   Settings,
   ArrowRightLeft,
   FileText,
-  Archive as ArchiveIcon
+  Archive as ArchiveIcon,
+  Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -55,6 +56,7 @@ interface PO {
 
 import SettingsComponent from './Settings';
 import Transfers from './Transfers';
+import CashRequests from './CashRequests';
 
 import InternalRequests from './InternalRequests';
 import Archive from './Archive';
@@ -62,7 +64,7 @@ import Archive from './Archive';
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const { user, role, tenantId, unitId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'archive' | 'users' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings'>('dashboard');
   const [pos, setPos] = useState<PO[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,7 +188,7 @@ export default function Dashboard() {
           </button>
         </div>
         
-        <nav className="flex-1 py-6 px-3 space-y-1">
+        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
           <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Menu Principal</div>
           <button 
             onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
@@ -237,6 +239,13 @@ export default function Dashboard() {
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'archive' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
             <ArchiveIcon size={16} /> {t('archive')}
+          </button>
+
+          <button 
+            onClick={() => { setActiveTab('cash'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'cash' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+          >
+            <Coins size={16} /> {t('cash_requests')}
           </button>
           
           {role === 'admin' && (
@@ -334,7 +343,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="p-8 flex-1 overflow-y-auto">
+        <div className="p-4 sm:p-8 flex-1 overflow-y-auto w-full">
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && (
               <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
@@ -455,6 +464,7 @@ export default function Dashboard() {
 
             {activeTab === 'da' && <motion.div key="da" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><InternalRequests onConvertToPO={handleConvertDAToPO} /></motion.div>}
             {activeTab === 'archive' && <motion.div key="archive" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Archive /></motion.div>}
+            {activeTab === 'cash' && <motion.div key="cash" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><CashRequests /></motion.div>}
             {activeTab === 'transfers' && <motion.div key="transfers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Transfers /></motion.div>}
             {activeTab === 'suppliers' && <motion.div key="suppliers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Suppliers /></motion.div>}
             {activeTab === 'products' && <motion.div key="products" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Products /></motion.div>}
