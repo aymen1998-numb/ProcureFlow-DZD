@@ -104,7 +104,7 @@ export default function Archive() {
           autoTable(doc, {
             startY: y,
             head: [['SKU', 'Produit', 'Qté']],
-            body: item.items.map((i: any) => [i.sku || '-', i.name, i.quantity]),
+            body: item.items.map((i: any) => [i.sku || '-', i.name, `${i.quantity} ${i.unit || 'pcs'}`]),
             theme: 'grid',
             headStyles: { fillColor: [19, 106, 168] }
           });
@@ -112,7 +112,7 @@ export default function Archive() {
           autoTable(doc, {
             startY: y,
             head: [['Désignation', 'Stock', 'Conso/Mois', 'Qté Dem.']],
-            body: item.items.map((i: any) => [i.name, i.qtyInStock || 0, i.monthlyConsumption || 0, i.quantity]),
+            body: item.items.map((i: any) => [i.name, i.qtyInStock || 0, i.monthlyConsumption || 0, `${i.quantity} ${i.unit || 'pcs'}`]),
             theme: 'grid',
             headStyles: { fillColor: [19, 106, 168] }
           });

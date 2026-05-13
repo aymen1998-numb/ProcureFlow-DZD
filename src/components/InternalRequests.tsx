@@ -14,7 +14,7 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [items, setItems] = useState<any[]>([{ name: '', qtyInStock: 0, monthlyConsumption: 0, quantity: 1, category: '' }]);
+  const [items, setItems] = useState<any[]>([{ name: '', qtyInStock: 0, monthlyConsumption: 0, quantity: 1, category: '', unit: 'pcs' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
         createdAt: new Date().toISOString(),
       });
       setIsModalOpen(false);
-      setItems([{ sku: '', name: '', quantity: 1, category: '' }]);
+      setItems([{ name: '', qtyInStock: 0, monthlyConsumption: 0, quantity: 1, category: '', unit: 'pcs' }]);
     } catch (err) {
       console.error(err);
       alert("Erreur lors de la création de la DA.");
@@ -186,7 +186,7 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
                       </div>
                       <div className="text-right whitespace-nowrap">
                         <span className="text-[10px] text-slate-400 block mb-0.5">Qté Dem.</span>
-                        <span className="text-sm font-black text-[#136AA8] leading-none">{item.quantity}</span>
+                        <span className="text-sm font-black text-[#136AA8] leading-none">{item.quantity} {item.unit || 'pcs'}</span>
                       </div>
                     </div>
                   ))}
@@ -222,7 +222,7 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h4 className="text-xs font-black uppercase tracking-widest text-[#136AA8]">Articles à demander</h4>
-                        <button type="button" onClick={() => setItems([...items, { name: '', qtyInStock: 0, monthlyConsumption: 0, quantity: 1, category: '' }])} className="text-xs font-bold text-[#009CDA] hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                        <button type="button" onClick={() => setItems([...items, { name: '', qtyInStock: 0, monthlyConsumption: 0, quantity: 1, category: '', unit: 'pcs' }])} className="text-xs font-bold text-[#009CDA] hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                           <Plus size={14} /> Ajouter un article
                         </button>
                       </div>
@@ -234,13 +234,30 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Désignation *</label>
                               <input required value={item.name} onChange={e => { const newItems = [...items]; newItems[index].name = e.target.value; setItems(newItems); }} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:border-[#009CDA] focus:ring-1 focus:ring-[#009CDA] outline-none" placeholder="Nom de l'article" />
                             </div>
-                            <div className="col-span-4 sm:col-span-3">
+                            <div className="col-span-4 sm:col-span-2">
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Stock</label>
                               <input type="number" min="0" step="1" required value={item.qtyInStock} onChange={e => { const newItems = [...items]; newItems[index].qtyInStock = Number(e.target.value); setItems(newItems); }} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-center focus:border-[#009CDA] focus:ring-1 focus:ring-[#009CDA] outline-none" />
                             </div>
-                            <div className="col-span-4 sm:col-span-3">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Conso/mois</label>
+                            <div className="col-span-4 sm:col-span-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Conso/Mois</label>
                               <input type="number" min="0" step="1" required value={item.monthlyConsumption} onChange={e => { const newItems = [...items]; newItems[index].monthlyConsumption = Number(e.target.value); setItems(newItems); }} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-center focus:border-[#009CDA] focus:ring-1 focus:ring-[#009CDA] outline-none" />
+                            </div>
+                            <div className="col-span-4 sm:col-span-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Unité</label>
+                              <select value={item.unit || 'pcs'} onChange={e => { const newItems = [...items]; newItems[index].unit = e.target.value; setItems(newItems); }} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-center focus:border-[#009CDA] focus:ring-1 focus:ring-[#009CDA] outline-none">
+                                <option value="pcs">Pièces</option>
+                                <option value="kg">Kg</option>
+                                <option value="g">G</option>
+                                <option value="l">Litres</option>
+                                <option value="ml">mL</option>
+                                <option value="m">Mètres</option>
+                                <option value="m2">m²</option>
+                                <option value="m3">m³</option>
+                                <option value="boxes">Boîtes</option>
+                                <option value="packs">Packs</option>
+                                <option value="pallets">Palettes</option>
+                                <option value="rolls">Rouleaux</option>
+                              </select>
                             </div>
                             <div className="col-span-4 sm:col-span-2">
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Qté Dem.</label>

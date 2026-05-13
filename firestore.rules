@@ -10,8 +10,8 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     function getUserData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
-    function role() { return getUserData().role; }
-    function getTenantId() { return getUserData().get('tenantId', request.auth.uid); }
+    function role() { return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData().get('role', 'user') : 'user'; }
+    function getTenantId() { return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData().get('tenantId', request.auth.uid) : request.auth.uid; }
     function isAdmin() { return isSignedIn() && role() == 'admin'; }
     function isBuyer() { return isSignedIn() && role() == 'buyer'; }
     function isFinance() { return isSignedIn() && role() == 'finance'; }
@@ -30,31 +30,35 @@ service cloud.firestore {
       allow get: if isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId());
       allow list: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().uid == userId;
-      allow update: if (isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId())) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'email', 'createdAt', 'tenantId', 'unitId']);
+      allow update: if (isOwner(userId) || (isSignedIn() && existing().tenantId == getTenantId())) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'email', 'createdAt', 'tenantId', 'unitId', 'fullName', 'createdBy', 'uid']);
     }
 
     match /purchase_requests/{reqId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();
-      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
     }
 
     match /suppliers/{supplierId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();
-      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
     }
 
     match /products/{productId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();
-      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
     }
 
     match /purchase_orders/{poId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();
-      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
 
       match /deliveries/{dnId} {
         allow read: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
@@ -75,13 +79,15 @@ service cloud.firestore {
     match /cash_requests/{reqId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();
-      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
     }
 
     match /transfers/{transferId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();
-      allow update, delete: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
     }
   }
 }

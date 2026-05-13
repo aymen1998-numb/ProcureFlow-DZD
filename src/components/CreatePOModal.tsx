@@ -212,7 +212,7 @@ export default function CreatePOModal({ isOpen, onClose, initialData }: { isOpen
               </div>
               <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto pr-2 no-scrollbar">
                 {catalog.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
-                  <div key={p.id} className="p-4 border border-slate-100 rounded-2xl flex justify-between items-center hover:bg-slate-50 hover:border-slate-200 cursor-pointer transition-all group" onClick={() => setItems([...items, {...p, quantity: 1, price: p.defaultPrice || 0}])}>
+                  <div key={p.id} className="p-4 border border-slate-100 rounded-2xl flex justify-between items-center hover:bg-slate-50 hover:border-slate-200 cursor-pointer transition-all group" onClick={() => setItems([...items, {...p, quantity: 1, price: p.defaultPrice || 0, unit: p.unit || 'pcs'}])}>
                     <div>
                       <p className="font-bold text-[#136AA8] text-sm group-hover:text-[#009CDA] transition-colors uppercase">{p.name}</p>
                       <p className="text-[10px] text-slate-400 font-mono tracking-tighter mt-0.5">{p.sku}</p>
@@ -249,9 +249,16 @@ export default function CreatePOModal({ isOpen, onClose, initialData }: { isOpen
                         <input type="number" className="w-16 p-1 bg-slate-50 border border-slate-100 rounded text-xs font-black text-center focus:ring-2 focus:ring-blue-100 outline-none" value={item.quantity} onChange={e => {
                           const ni = [...items]; ni[i].quantity = Number(e.target.value); setItems(ni);
                         }} />
+                        <span className="text-[10px] uppercase font-bold text-slate-500">{item.unit || 'pcs'}</span>
                       </div>
                       <div className="h-4 w-px bg-slate-100" />
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Prix: {item.price?.toLocaleString()} DZD</p>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Prix:</span>
+                        <input type="number" min="0" step="any" className="w-24 p-1 bg-slate-50 border border-slate-100 rounded text-xs font-black text-center focus:ring-2 focus:ring-blue-100 outline-none" value={item.price} onChange={e => {
+                          const ni = [...items]; ni[i].price = Number(e.target.value); setItems(ni);
+                        }} />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">DZD</span>
+                      </div>
                     </div>
                   </div>
                   <button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="w-8 h-8 flex items-center justify-center text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={16} /></button>

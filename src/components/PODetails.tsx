@@ -305,7 +305,7 @@ export default function PODetails() {
       doc.text(`Paiement : ${po.paymentModality || 'Non spécifié'}`, 14, detailsY); detailsY += 5;
       
       const tableData = po.items.map((item: any) => [
-        item.sku, item.name, item.quantity, item.price?.toLocaleString(), (item.quantity * item.price)?.toLocaleString()
+        item.sku, item.name, `${item.quantity} ${item.unit || 'pcs'}`, item.price?.toLocaleString(), (item.quantity * item.price)?.toLocaleString()
       ]);
 
       const tableStartY = detailsY + 5;
@@ -410,7 +410,7 @@ export default function PODetails() {
       if (supplier?.bankInfo) { doc.text(`Banque Fournisseur: ${supplier.bankInfo}`, 14, detailsY); detailsY += 5; }
       
       const tableData = po.items.map((item: any) => [
-        item.sku, item.name, item.quantity, item.price?.toLocaleString(), (item.quantity * item.price)?.toLocaleString()
+        item.sku, item.name, `${item.quantity} ${item.unit || 'pcs'}`, item.price?.toLocaleString(), (item.quantity * item.price)?.toLocaleString()
       ]);
 
       const tableStartY = detailsY + 5;
@@ -583,7 +583,7 @@ export default function PODetails() {
                         <p className="text-[#136AA8] font-bold">{item.name}</p>
                         <p className="text-[10px] text-gray-400 uppercase tracking-tighter font-mono">{item.sku}</p>
                       </td>
-                      <td className="py-5 text-center font-mono">{item.quantity} <span className="text-[10px] text-gray-400 font-sans">{item.unit}</span></td>
+                      <td className="py-5 text-center font-mono">{item.quantity} <span className="text-[10px] text-gray-400 font-sans">{item.unit || 'pcs'}</span></td>
                       <td className="py-5 text-right font-mono">{item.price?.toLocaleString()}</td>
                       <td className="py-5 text-right font-mono">{(item.quantity * item.price)?.toLocaleString()}</td>
                     </tr>
