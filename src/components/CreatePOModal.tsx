@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc } from 'firebase/firestore';
-import { X, Loader2, Save, ShoppingBag, Search, RefreshCw, Trash2 } from 'lucide-react';
+import { X, Loader2, Save, ShoppingBag, Search, RefreshCw, Trash2, Plus, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -19,6 +19,10 @@ export default function CreatePOModal({ isOpen, onClose, initialData }: { isOpen
   const [poError, setPoError] = useState<string | null>(null);
   const [tvaRate, setTvaRate] = useState(19);
   const [paymentModality, setPaymentModality] = useState('Chèque');
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [isCreatingSupplier, setIsCreatingSupplier] = useState(false);
+  const [newSupplierNIF, setNewSupplierNIF] = useState('');
 
   useEffect(() => {
     if (isOpen && tenantId) {
@@ -95,7 +99,7 @@ export default function CreatePOModal({ isOpen, onClose, initialData }: { isOpen
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'purchase_orders'), {
+      const poRef = await addDoc(collection(db, 'purchase_orders'), {
         poNumber, supplierId: selectedSupplier.id, supplierName: selectedSupplier.name,
         unit: selectedUnit || null,
         date: new Date().toISOString().split('T')[0], status: 'draft', items, totalAmount: total, totalHT, tvaAmount, tvaRate,
@@ -105,6 +109,13 @@ export default function CreatePOModal({ isOpen, onClose, initialData }: { isOpen
         currency: 'DZD', buyerId: user.uid, buyerName: user.displayName || 'Buyer',
         tenantId: tenantId,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+
+      await addDoc(collection(db, 'purchase_orders', poRef.id, 'status_history'), {
+        status: 'draft',
+        userName: user.displayName || user.email || 'Système',
+        tenantId: tenantId,
+        createdAt: new Date().toISOString()
       });
       
       if (initialData?.linkedDA) {
@@ -173,16 +184,77 @@ export default function CreatePOModal({ isOpen, onClose, initialData }: { isOpen
                     {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
-                <div>
+                <div className="relative">
                   <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Fournisseur</label>
-                  <select 
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-[#136AA8] focus:ring-4 focus:ring-blue-50 outline-none transition-all cursor-pointer" 
-                    value={selectedSupplier?.id || ''} 
-                    onChange={e => setSelectedSupplier(suppliers.find(s => s.id === e.target.value))}
-                  >
-                    <option value="">Sélectionner un Fournisseur</option>
-                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+                  {selectedSupplier ? (
+                    <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-xl flex justify-between items-center group">
+                      <div>
+                        <div className="font-bold text-[#136AA8] text-sm uppercase">{selectedSupplier.name}</div>
+                        {selectedSupplier.nif && <div className="text-[10px] font-mono text-blue-600">NIF: {selectedSupplier.nif}</div>}
+                      </div>
+                      <button type="button" onClick={() => setSelectedSupplier(null)} className="text-blue-400 hover:text-red-500 hover:bg-white p-1 rounded-lg transition-colors"><X size={16}/></button>
+                    </div>
+                  ) : isCreatingSupplier ? (
+                    <div className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 relative overflow-hidden">
+                       <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 flex items-center gap-1.5"><Building2 size={12}/> Nouveau Fournisseur</h4>
+                       <input className="w-full p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-[#136AA8] outline-none focus:ring-2 focus:ring-blue-100" placeholder="Nom de l'établissement *" value={supplierSearchTerm} onChange={e => setSupplierSearchTerm(e.target.value)} />
+                       <input className="w-full p-3 bg-white border border-slate-200 rounded-lg text-sm font-mono font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-100" placeholder="NIF (Optionnel)" value={newSupplierNIF} onChange={e => setNewSupplierNIF(e.target.value)} />
+                       <div className="flex gap-2 pt-2">
+                         <button type="button" disabled={!supplierSearchTerm} className="flex-1 bg-[#136AA8] hover:bg-[#009CDA] text-white disabled:bg-slate-300 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-sm" onClick={async () => {
+                            if(!supplierSearchTerm || !tenantId) return;
+                            try {
+                              const newSupp = { name: supplierSearchTerm, nif: newSupplierNIF, tenantId, createdAt: new Date().toISOString() };
+                              const docRef = await addDoc(collection(db, 'suppliers'), newSupp);
+                              const created = { id: docRef.id, ...newSupp };
+                              setSuppliers([...suppliers, created]);
+                              setSelectedSupplier(created);
+                              setIsCreatingSupplier(false);
+                              setSupplierSearchTerm('');
+                              setNewSupplierNIF('');
+                            } catch (e) {
+                              console.error(e);
+                            }
+                         }}>Valider</button>
+                         <button type="button" className="px-4 bg-white hover:bg-slate-100 text-slate-500 border border-slate-200 py-2.5 rounded-lg text-xs font-black uppercase transition-colors" onClick={() => setIsCreatingSupplier(false)}>Annuler</button>
+                       </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                         <input 
+                            className="w-full p-4 pl-11 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-[#136AA8] focus:ring-4 focus:ring-blue-50 outline-none transition-all"
+                            value={supplierSearchTerm}
+                            onChange={e => {
+                               setSupplierSearchTerm(e.target.value);
+                               setShowSupplierDropdown(true);
+                            }}
+                            onFocus={() => setShowSupplierDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowSupplierDropdown(false), 200)}
+                            placeholder="Rechercher un fournisseur..."
+                         />
+                      </div>
+                      {showSupplierDropdown && (
+                        <div className="absolute z-20 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                          {suppliers.filter(s => s.name.toLowerCase().includes(supplierSearchTerm.toLowerCase())).map(s => (
+                             <div key={s.id} onClick={() => { setSelectedSupplier(s); setShowSupplierDropdown(false); setSupplierSearchTerm(''); }} className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors">
+                               <div className="font-bold text-sm text-slate-700 uppercase">{s.name}</div>
+                               {s.nif && <div className="text-[10px] font-mono text-slate-400 mt-0.5">NIF: {s.nif}</div>}
+                             </div>
+                          ))}
+                          {suppliers.filter(s => s.name.toLowerCase().includes(supplierSearchTerm.toLowerCase())).length === 0 && supplierSearchTerm && (
+                             <div className="p-4 bg-blue-50/50 hover:bg-blue-50 cursor-pointer text-[#136AA8] flex items-center justify-between transition-colors group" onClick={() => { setIsCreatingSupplier(true); setShowSupplierDropdown(false); }}>
+                               <div>
+                                 <span className="font-black text-[10px] uppercase tracking-widest block text-blue-400 mb-0.5">Nouveau Fournisseur</span>
+                                 <span className="font-bold text-sm uppercase">{supplierSearchTerm}</span>
+                               </div>
+                               <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform"><Plus size={16}/></div>
+                             </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Modalité de paiement</label>

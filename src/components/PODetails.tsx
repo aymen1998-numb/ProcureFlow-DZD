@@ -32,6 +32,35 @@ export default function PODetails() {
   const [companySettings, setCompanySettings] = useState<any>(null);
   const navigate = useNavigate();
 
+  const [isEditingItems, setIsEditingItems] = useState(false);
+  const [editedItems, setEditedItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (po && isEditingItems) {
+      setEditedItems(po.items || []);
+    }
+  }, [po, isEditingItems]);
+
+  const saveEditedItems = async () => {
+    if (!id || !po) return;
+    try {
+      const totalHT = editedItems.reduce((acc, curr) => acc + (curr.quantity * curr.price), 0);
+      const tvaAmount = totalHT * (po.tvaRate / 100);
+      const totalAmount = totalHT + tvaAmount;
+
+      await updateDoc(doc(db, 'purchase_orders', id), {
+        items: editedItems,
+        totalHT,
+        tvaAmount,
+        totalAmount,
+        updatedAt: new Date().toISOString()
+      });
+      setIsEditingItems(false);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `purchase_orders/${id}`);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
     const poRef = doc(db, 'purchase_orders', id);
@@ -89,7 +118,7 @@ export default function PODetails() {
       
       await addDoc(collection(db, 'purchase_orders', id, 'status_history'), {
         status: s,
-        userName: user.displayName || 'Unknown',
+        userName: user.displayName || user.email || 'Système',
         tenantId: tenantId,
         createdAt: new Date().toISOString()
       });
@@ -566,6 +595,24 @@ export default function PODetails() {
               </div>
             </div>
 
+            <div className="flex items-center justify-between mb-4 mt-8 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                <Package size={18} className="text-[#136AA8]"/> Articles Commandés
+              </h3>
+              {!['sent', 'confirmed', 'delivered', 'closed'].includes(po.status) && (
+                <button 
+                  onClick={() => isEditingItems ? saveEditedItems() : setIsEditingItems(true)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors ${
+                    isEditingItems 
+                      ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-200' 
+                      : 'bg-white text-[#136AA8] border border-blue-200 hover:bg-blue-50'
+                  }`}
+                >
+                  {isEditingItems ? 'Enregistrer les modifications' : 'Modifier les quantités / prix'}
+                </button>
+              )}
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -577,14 +624,34 @@ export default function PODetails() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {po.items.map((item: any, i: number) => (
+                  {(isEditingItems ? editedItems : po.items).map((item: any, i: number) => (
                     <tr key={i} className="text-sm font-bold text-gray-700">
                       <td className="py-5">
                         <p className="text-[#136AA8] font-bold">{item.name}</p>
                         <p className="text-[10px] text-gray-400 uppercase tracking-tighter font-mono">{item.sku}</p>
                       </td>
-                      <td className="py-5 text-center font-mono">{item.quantity} <span className="text-[10px] text-gray-400 font-sans">{item.unit || 'pcs'}</span></td>
-                      <td className="py-5 text-right font-mono">{item.price?.toLocaleString()}</td>
+                      <td className="py-5 text-center font-mono">
+                        {isEditingItems ? (
+                           <input type="number" value={item.quantity} onChange={e => {
+                               const arr = [...editedItems];
+                               arr[i].quantity = Number(e.target.value);
+                               setEditedItems(arr);
+                           }} className="w-16 p-1 bg-slate-50 border border-slate-200 rounded text-center" />
+                        ) : (
+                           <>{item.quantity} <span className="text-[10px] text-gray-400 font-sans">{item.unit || 'pcs'}</span></>
+                        )}
+                      </td>
+                      <td className="py-5 text-right font-mono">
+                         {isEditingItems ? (
+                           <input type="number" step="any" value={item.price} onChange={e => {
+                               const arr = [...editedItems];
+                               arr[i].price = Number(e.target.value);
+                               setEditedItems(arr);
+                           }} className="w-24 p-1 bg-slate-50 border border-slate-200 rounded text-right" />
+                         ) : (
+                           <>{item.price?.toLocaleString()}</>
+                         )}
+                      </td>
                       <td className="py-5 text-right font-mono">{(item.quantity * item.price)?.toLocaleString()}</td>
                     </tr>
                   ))}
