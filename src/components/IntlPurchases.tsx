@@ -7,7 +7,7 @@ import { Globe, Plus, Search, Trash2, CheckSquare, Square, FileText, ChevronRigh
 import { useTranslation } from 'react-i18next';
 
 export default function IntlPurchases() {
-  const { tenantId, role } = useAuth();
+  const { user, tenantId, role } = useAuth();
   const { t } = useTranslation();
   const [purchases, setPurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,11 +60,11 @@ export default function IntlPurchases() {
         daNumber: `INTL-${new Date().toISOString().split('T')[0].replace(/-/g,'')}-${Math.floor(Math.random()*1000)}`,
         items: [],
         status: 'proforma',
+        isConfirmed: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
-      // the snapshot will update the list
-      setSelectedPurchase({ id: docRef.id, daNumber: 'Nouveau' }); // optimistically set
+      setSelectedPurchase({ id: docRef.id, daNumber: 'Nouveau' }); 
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'intl_purchases');
     }
@@ -73,6 +73,34 @@ export default function IntlPurchases() {
   const updatePurchase = async (id: string, data: any) => {
     try {
       await updateDoc(doc(db, 'intl_purchases', id), { ...data, updatedAt: new Date().toISOString() });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `intl_purchases/${id}`);
+    }
+  };
+
+  const confirmPurchase = async (id: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir confirmer ce dossier ? Il ne pourra plus être modifié.")) return;
+    try {
+      await updateDoc(doc(db, 'intl_purchases', id), { 
+        isConfirmed: true,
+        confirmedBy: user?.displayName || user?.email,
+        confirmedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString() 
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `intl_purchases/${id}`);
+    }
+  };
+
+  const unconfirmPurchase = async (id: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir annuler la confirmation de ce dossier ?")) return;
+    try {
+      await updateDoc(doc(db, 'intl_purchases', id), { 
+        isConfirmed: false,
+        confirmedBy: null,
+        confirmedAt: null,
+        updatedAt: new Date().toISOString() 
+      });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `intl_purchases/${id}`);
     }
@@ -137,90 +165,159 @@ export default function IntlPurchases() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1 border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden flex flex-col min-h-[600px] max-h-[800px]">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 font-bold text-sm text-slate-700">
-            Dossiers ({filteredPurchases.length})
-          </div>
-          <div className="overflow-y-auto flex-1 p-2 space-y-2">
-            {loading ? (
-              <div className="p-8 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
-            ) : filteredPurchases.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 font-medium text-sm">Aucun achat international trouvé.</div>
-            ) : (
-              filteredPurchases.map(p => (
-                <div 
-                  key={p.id}
-                  onClick={() => setSelectedPurchase(p)}
-                  className={`p-4 rounded-xl cursor-pointer border transition-all ${selectedPurchase?.id === p.id ? 'bg-[#EFF6FF] border-[#136AA8] shadow-sm' : 'bg-white border-slate-100 hover:border-slate-300'}`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-black uppercase text-slate-400 tracking-wider">DA: {p.daNumber}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${getStatusColor(p.status)}`}>
-                      {getStatusLabel(p.status)}
-                    </span>
-                  </div>
-                  <h3 className="font-bold text-slate-800 text-sm mb-1">{p.supplierName || 'Fournisseur à définir'}</h3>
-                  <div className="flex justify-between items-center mt-3">
-                    <div className="text-xs text-slate-500 font-medium font-mono">{p.paymentMethod || '-'}</div>
-                    {['admin', 'buyer'].includes(role || '') && (
-                      <button onClick={(e) => handleDelete(p.id, e)} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="md:col-span-2">
-          {selectedPurchase ? (
-            <PurchaseDetails purchase={selectedPurchase} onUpdate={(data) => updatePurchase(selectedPurchase.id, data)} role={role} />
-          ) : (
-            <div className="h-full min-h-[600px] border border-slate-200 rounded-2xl bg-slate-50/50 border-dashed flex flex-col items-center justify-center text-slate-400 p-8 text-center">
-              <Globe className="w-16 h-16 mb-4 text-slate-300" />
-              <h3 className="text-lg font-bold text-slate-600 mb-2">Sélectionnez un dossier</h3>
-              <p className="text-sm max-w-sm">Cliquez sur un achat international dans la liste pour voir ses détails, gérer les paiements et le dédouanement.</p>
-            </div>
-          )}
+      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-widest text-[10px]">
+                <th className="px-5 py-4">N° Dossier / DA</th>
+                <th className="px-5 py-4">Fournisseur</th>
+                <th className="px-5 py-4">Infos Logistique</th>
+                <th className="px-5 py-4">Dédouanement</th>
+                <th className="px-5 py-4 text-center">Paiement</th>
+                <th className="px-5 py-4 text-center">Statut</th>
+                <th className="px-5 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                    Chargement des dossiers...
+                  </td>
+                </tr>
+              ) : filteredPurchases.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center text-slate-500 font-medium font-mono">Aucun achat international trouvé.</td>
+                </tr>
+              ) : (
+                filteredPurchases.map(p => (
+                  <tr key={p.id} onClick={() => setSelectedPurchase(p)} className="hover:bg-slate-50 transition-colors group cursor-pointer">
+                    <td className="px-5 py-4 font-mono font-bold text-slate-700">
+                      <div>{p.daNumber}</div>
+                      {p.isConfirmed && <div className="text-[9px] text-[#136AA8] mt-1 bg-blue-50 inline-block px-1.5 py-0.5 rounded uppercase font-black">Confirmé par {p.confirmedBy}</div>}
+                    </td>
+                    <td className="px-5 py-4 font-bold text-slate-900">{p.supplierName || '-'}</td>
+                    <td className="px-5 py-4">
+                      <div className="text-xs font-bold text-slate-700">{p.incoterm || '-'} / {p.transportMethod || '-'}</div>
+                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">{p.proformaRef ? `Prof: ${p.proformaRef}` : ''}</div>
+                    </td>
+                    <td className="px-5 py-4">
+                      {p.dateArriveePort ? (
+                        <>
+                          <div className="text-xs font-bold text-slate-700">Arr: {new Date(p.dateArriveePort).toLocaleDateString()}</div>
+                          {p.joursFranchise && (
+                            <div className="text-[10px] font-mono mt-0.5 text-slate-500">Fran: {p.joursFranchise} j</div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">-</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
+                        {p.paymentMethod || 'Non défini'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <span className={`text-[10px] px-2.5 py-1 rounded-full font-black uppercase tracking-widest bg-opacity-20 ${getStatusColor(p.status)}`}>
+                        {getStatusLabel(p.status)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      {['admin', 'buyer'].includes(role || '') && !p.isConfirmed && (
+                        <button onClick={(e) => handleDelete(p.id, e)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Supprimer">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      <AnimatePresence>
+        {selectedPurchase && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setSelectedPurchase(null)}>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden" 
+              onClick={e => e.stopPropagation()}
+            >
+              <PurchaseDetails 
+                purchase={selectedPurchase} 
+                onUpdate={(data) => updatePurchase(selectedPurchase.id, data)} 
+                onConfirm={() => confirmPurchase(selectedPurchase.id)}
+                onUnconfirm={() => unconfirmPurchase(selectedPurchase.id)}
+                role={role}
+                currentUser={user?.displayName || user?.email}
+                onClose={() => setSelectedPurchase(null)}
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate: (data: any) => void, role: string|null }) {
+function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, currentUser, onClose }: { purchase: any, onUpdate: (data: any) => void, onConfirm: () => void, onUnconfirm: () => void, role: string|null, currentUser: string|null|undefined, onClose: () => void }) {
   const steps = ['proforma', 'payment_processing', 'documents_pending', 'dedouanement', 'completed'];
   const currentStepIdx = steps.indexOf(purchase.status || 'proforma');
 
   const docs = purchase.documents || { facture: false, bl: false, certOrigin: false, packingList: false, revised: false };
   const allDocsChecked = docs.facture && docs.bl && docs.certOrigin && docs.packingList;
+  
+  const isReadOnly = purchase.isConfirmed;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full max-h-[800px]">
-      <div className="p-6 border-b border-slate-100 bg-[#136AA8] text-white">
-        <div className="flex justify-between items-start">
+    <>
+      <div className="p-6 border-b border-slate-100 bg-[#136AA8] text-white shrink-0 relative">
+        <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-colors">
+          <X size={20} />
+        </button>
+        <div className="flex flex-col sm:flex-row justify-between items-start pr-12 gap-4">
           <div>
-            <div className="text-blue-200 text-xs font-black uppercase tracking-wider mb-1">DA SOURCE: {purchase.daNumber}</div>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="text-blue-200 text-xs font-black uppercase tracking-wider">DA SOURCE: {purchase.daNumber}</div>
+              {purchase.isConfirmed && (
+                <span className="bg-emerald-500/20 text-white border border-emerald-400 border-opacity-50 text-[10px] uppercase font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <CheckSquare size={12} /> Confirmé par {purchase.confirmedBy}
+                </span>
+              )}
+            </div>
             <h2 className="text-xl font-bold">{purchase.supplierName || 'Nouveau Dossier d\'Importation'}</h2>
           </div>
-          <div>
-             <select 
-              value={purchase.status} 
-              onChange={e => onUpdate({ status: e.target.value })}
-              className="bg-blue-800 border-none text-white text-sm rounded-lg py-2 px-4 focus:ring-2 font-bold outline-none cursor-pointer"
-             >
-               <option value="proforma">Proforma</option>
-               <option value="payment_processing">Traitement Paiement</option>
-               <option value="documents_pending">Attente Documents</option>
-               <option value="dedouanement">Dédouanement</option>
-               <option value="completed">Clôturé</option>
-             </select>
+          <div className="flex items-center gap-3">
+             {isReadOnly ? (
+                <div className="bg-blue-900 border-none text-white text-sm font-bold uppercase tracking-widest rounded-lg py-2 px-4 select-none opacity-80 cursor-not-allowed">
+                  Status: {purchase.status}
+                </div>
+             ) : (
+               <select 
+                value={purchase.status} 
+                onChange={e => onUpdate({ status: e.target.value })}
+                className="bg-blue-800 border-none text-white text-sm rounded-lg py-2 px-4 focus:ring-2 font-bold outline-none cursor-pointer"
+               >
+                 <option value="proforma">Proforma</option>
+                 <option value="payment_processing">Traitement Paiement</option>
+                 <option value="documents_pending">Attente Documents</option>
+                 <option value="dedouanement">Dédouanement</option>
+                 <option value="completed">Clôturé</option>
+               </select>
+             )}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
+
         
         {/* PROGRESS BAR */}
         <div className="flex items-center justify-between relative px-2">
@@ -249,8 +346,9 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
               <input 
                 value={purchase.supplierName || ''} 
                 onChange={e => onUpdate({ supplierName: e.target.value })}
+                disabled={isReadOnly}
                 placeholder="Nom du fournisseur..."
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white"
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -258,8 +356,9 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
               <input 
                 value={purchase.proformaRef || ''} 
                 onChange={e => onUpdate({ proformaRef: e.target.value })}
+                disabled={isReadOnly}
                 placeholder="Ex: PROF-2026-001..."
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-white"
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -268,7 +367,8 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                 <select 
                   value={purchase.incoterm || ''} 
                   onChange={e => onUpdate({ incoterm: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white"
+                  disabled={isReadOnly}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   <option value="">Sélectionner...</option>
                   <option value="CFR">CFR (Maritime)</option>
@@ -285,7 +385,8 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                 <select 
                   value={purchase.transportMethod || ''} 
                   onChange={e => onUpdate({ transportMethod: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white"
+                  disabled={isReadOnly}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   <option value="">Sélectionner...</option>
                   <option value="maritime">Maritime</option>
@@ -301,7 +402,8 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
               <select 
                 value={purchase.paymentMethod || ''} 
                 onChange={e => onUpdate({ paymentMethod: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white"
+                disabled={isReadOnly}
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
               >
                 <option value="">Sélectionner...</option>
                 <option value="LC">Lettre de Crédit (LC)</option>
@@ -316,13 +418,15 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                   type="number"
                   value={purchase.totalAmount || ''} 
                   onChange={e => onUpdate({ totalAmount: e.target.value ? Number(e.target.value) : null })}
+                  disabled={isReadOnly}
                   placeholder="0.00"
-                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-white"
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
                 />
                 <select 
                   value={purchase.currency || 'EUR'}
                   onChange={e => onUpdate({ currency: e.target.value })}
-                  className="bg-slate-50 border border-slate-200 px-2 rounded-lg text-sm font-bold w-24"
+                  disabled={isReadOnly}
+                  className="bg-slate-50 border border-slate-200 px-2 rounded-lg text-sm font-bold w-24 disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
@@ -334,13 +438,15 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
         </div>
 
         {/* DOCUMENT CHECKLIST */}
-        <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+        <div className="bg-white shadow-sm rounded-2xl p-5 border border-slate-200">
           <div className="flex justify-between items-center mb-4">
              <h3 className="font-black text-sm text-slate-700 uppercase tracking-widest flex items-center gap-2">
                 <FileCheck size={18} className="text-[#136AA8]" /> Dossier d'Importation
              </h3>
              {allDocsChecked && docs.revised && (
-               <span className="bg-emerald-100 text-emerald-700 text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-md">Dossier Complet et Révisé</span>
+               <span className="bg-emerald-100 text-emerald-700 text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-md">
+                 Dossier Complet et Révisé{purchase.documentsCheckedBy ? ` par ${purchase.documentsCheckedBy}` : ''}
+               </span>
              )}
           </div>
           
@@ -354,8 +460,20 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
             ].map(docItem => (
               <div 
                 key={docItem.key}
-                onClick={() => onUpdate({ documents: { ...docs, [docItem.key]: !docs[docItem.key as keyof typeof docs] } })}
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${docs[docItem.key as keyof typeof docs] ? 'bg-white border-[#136AA8] shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'} ${docItem.key === 'revised' && !allDocsChecked ? 'opacity-50 pointer-events-none' : ''}`}
+                onClick={() => {
+                  if (isReadOnly) return;
+                  if (docItem.key === 'revised' && !allDocsChecked) return;
+                  const newValue = !docs[docItem.key as keyof typeof docs];
+                  const newDocs = { ...docs, [docItem.key]: newValue };
+                  let updatePayload: any = { documents: newDocs };
+                  
+                  if (docItem.key === 'revised') {
+                    updatePayload.documentsCheckedBy = newValue ? currentUser : null;
+                  }
+                  
+                  onUpdate(updatePayload);
+                }}
+                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${isReadOnly ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer hover:border-slate-300'} ${docs[docItem.key as keyof typeof docs] ? 'bg-blue-50 border-[#136AA8] shadow-sm' : 'bg-slate-50 border-slate-200'} ${docItem.key === 'revised' && !allDocsChecked && !isReadOnly ? 'opacity-50 pointer-events-none' : ''}`}
                 title={docItem.key === 'revised' && !allDocsChecked ? 'Tous les documents doivent être cochés d\'abord' : ''}
               >
                 <div className={`w-5 h-5 rounded flex items-center justify-center ${docs[docItem.key as keyof typeof docs] ? 'bg-[#136AA8] text-white' : 'border-2 border-slate-300'}`}>
@@ -366,20 +484,23 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
             ))}
           </div>
 
-          <div className="mt-6 pt-5 border-t border-slate-200 flex justify-end">
-            <button 
-               onClick={() => onUpdate({ status: 'dedouanement' })}
-               disabled={!allDocsChecked || !docs.revised || purchase.status === 'dedouanement' || purchase.status === 'completed'}
-               className="bg-[#136AA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-800 transition-colors uppercase tracking-widest flex items-center gap-2"
-            >
-              <Ship size={18} /> Passer au Dédouanement
-            </button>
-          </div>
+          {!isReadOnly && (
+            <div className="mt-6 pt-5 border-t border-slate-200 flex justify-end">
+              <button 
+                 onClick={() => onUpdate({ status: 'dedouanement' })}
+                 disabled={!allDocsChecked || !docs.revised || purchase.status === 'dedouanement' || purchase.status === 'completed'}
+                 className="bg-[#136AA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-800 transition-colors uppercase tracking-widest flex items-center gap-2"
+              >
+                <Ship size={18} /> Passer au Dédouanement
+              </button>
+            </div>
+          )}
         </div>
 
         {/* DEDOUANEMENT TRACKING */}
         {currentStepIdx >= 3 && (
-          <div className="bg-orange-50/50 rounded-2xl p-5 border border-orange-100">
+          <div className="bg-orange-50/50 rounded-2xl p-5 border border-orange-100 shadow-sm relative overflow-hidden">
+            {isReadOnly && <div className="absolute inset-0 bg-white/20 z-10 pointer-events-none"></div>}
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-black text-sm text-orange-800 uppercase tracking-widest flex items-center gap-2">
                  <Ship size={18} /> Suivi de Dédouanement
@@ -420,8 +541,9 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                 <input 
                   value={purchase.transitaire || ''} 
                   onChange={e => onUpdate({ transitaire: e.target.value })}
+                  disabled={isReadOnly}
                   placeholder="Nom du transitaire..."
-                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-orange-50 focus:border-orange-300 outline-none"
+                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -429,8 +551,9 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                 <input 
                   value={purchase.numeroDeclaration || ''} 
                   onChange={e => onUpdate({ numeroDeclaration: e.target.value })}
+                  disabled={isReadOnly}
                   placeholder="N° de déclaration..."
-                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none"
+                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -439,7 +562,8 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                   type="date"
                   value={purchase.dateArriveePort || ''} 
                   onChange={e => onUpdate({ dateArriveePort: e.target.value })}
-                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-orange-50 focus:border-orange-300 outline-none"
+                  disabled={isReadOnly}
+                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -448,7 +572,8 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                   type="date"
                   value={purchase.dateSortiePort || ''} 
                   onChange={e => onUpdate({ dateSortiePort: e.target.value })}
-                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-orange-50 focus:border-orange-300 outline-none"
+                  disabled={isReadOnly}
+                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -483,8 +608,9 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                   type="number"
                   value={purchase.joursFranchise || ''} 
                   onChange={e => onUpdate({ joursFranchise: e.target.value ? Number(e.target.value) : null })}
+                  disabled={isReadOnly}
                   placeholder="Ex: 10"
-                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-orange-50 focus:border-orange-300 outline-none"
+                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -493,13 +619,14 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
                   type="number"
                   value={purchase.fraisDouane || ''} 
                   onChange={e => onUpdate({ fraisDouane: e.target.value ? Number(e.target.value) : null })}
+                  disabled={isReadOnly}
                   placeholder="0.00"
-                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none"
+                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
             
-            {purchase.status === 'dedouanement' && (
+            {purchase.status === 'dedouanement' && !isReadOnly && (
               <div className="mt-6 pt-5 border-t border-orange-200/50 flex justify-end">
                 <button 
                   onClick={() => onUpdate({ status: 'completed' })}
@@ -532,6 +659,33 @@ function PurchaseDetails({ purchase, onUpdate, role }: { purchase: any, onUpdate
           </div>
         )}
       </div>
-    </div>
+
+      <div className="p-4 border-t border-slate-100 bg-white shrink-0">
+        {!isReadOnly ? (
+          <div className="flex justify-end">
+            <button
+               onClick={onConfirm}
+               className="bg-[#136AA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-800 transition-colors flex items-center gap-2 uppercase tracking-widest shadow-sm"
+            >
+              <CheckSquare size={18} /> Confirmer le Dossier
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
+             <div className="text-slate-500 text-sm font-medium">
+               Dossier confirmé et verrouillé.
+             </div>
+             {['admin'].includes(role || '') && (
+               <button
+                 onClick={onUnconfirm}
+                 className="text-red-500 hover:text-white hover:bg-red-500 border border-red-500 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2 uppercase tracking-widest"
+               >
+                 <X size={16} /> Annuler Confirmation (Admin)
+               </button>
+             )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
