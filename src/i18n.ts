@@ -4,6 +4,7 @@ import { initReactI18next } from 'react-i18next';
 const resources = {
   fr: {
     translation: {
+      "intl_purchases": "Achats Internationaux",
       "dashboard": "Tableau de Bord",
       "da": "Demandes d'Achat",
       "cash_requests": "Bon de Caisse (بيان صرف)",
@@ -21,6 +22,7 @@ const resources = {
   },
   ar: {
     translation: {
+      "intl_purchases": "المشتريات الدولية",
       "dashboard": "لوحة القيادة",
       "da": "طلبات الشراء",
       "cash_requests": "بيان صرف",

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 import { motion } from 'motion/react';
-import { Clock, Package, Building2, Users as UsersIcon, FileText, Coins } from 'lucide-react';
+import { Clock, Package, Building2, Users as UsersIcon, FileText, Coins, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function ActivityLog() {
@@ -20,6 +20,15 @@ export default function ActivityLog() {
         updateActivities(prods, 'product');
       },
       (error) => console.error('Products listener error:', error)
+    );
+
+    const unsubStock = onSnapshot(
+      query(collection(db, 'stock_movements'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(20)), 
+      (snap) => {
+        const mvts = snap.docs.map(d => ({ ...d.data(), id: d.id, type_action: d.data().type, type: 'stock_movement' }));
+        updateActivities(mvts, 'stock_movement');
+      },
+      (error) => console.error('Stock movements listener error:', error)
     );
 
     const unsubSuppliers = onSnapshot(
@@ -65,6 +74,7 @@ export default function ActivityLog() {
 
     return () => {
       unsubProducts();
+      unsubStock();
       unsubSuppliers();
       unsubOrders();
       unsubCash();
@@ -72,7 +82,7 @@ export default function ActivityLog() {
     };
   }, [tenantId]);
 
-  const [cache, setCache] = useState<Record<string, any[]>>({ product: [], supplier: [], order: [], cash: [], user: [] });
+  const [cache, setCache] = useState<Record<string, any[]>>({ product: [], supplier: [], order: [], cash: [], user: [], stock_movement: [] });
 
   const updateActivities = (newItems: any[], type: string) => {
     setCache(prev => {
@@ -107,6 +117,7 @@ export default function ActivityLog() {
                  {item.type === 'order' && <FileText size={16} className="text-indigo-500" />}
                  {item.type === 'user' && <UsersIcon size={16} className="text-orange-500" />}
                  {item.type === 'cash' && <Coins size={16} className="text-amber-500" />}
+                 {item.type === 'stock_movement' && <ArrowRightLeft size={16} className={item.quantity > 0 ? "text-emerald-500" : "text-red-500"} />}
                </div>
 
                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
@@ -115,12 +126,14 @@ export default function ActivityLog() {
                       item.type === 'product' ? 'text-blue-500' : 
                       item.type === 'supplier' ? 'text-emerald-500' : 
                       item.type === 'order' ? 'text-indigo-500' : 
-                      item.type === 'cash' ? 'text-amber-500' : 'text-orange-500'
+                      item.type === 'cash' ? 'text-amber-500' : 
+                      item.type === 'stock_movement' ? (item.quantity > 0 ? 'text-emerald-500' : 'text-red-500') : 'text-orange-500'
                     }`}>
                       {item.type === 'product' ? 'Nouveau Produit' : 
                        item.type === 'supplier' ? 'Nouveau Fournisseur' : 
                        item.type === 'order' ? 'Nouvelle Commande' : 
-                       item.type === 'cash' ? 'Demande de Caisse' : 'Nouvel Utilisateur'}
+                       item.type === 'cash' ? 'Demande de Caisse' : 
+                       item.type === 'stock_movement' ? (item.type_action === 'add' ? 'Entrée Stock' : item.type_action === 'remove' ? 'Sortie Stock' : 'Ajustement Stock') : 'Nouvel Utilisateur'}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400">
                       {new Date(item.createdAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
@@ -130,10 +143,12 @@ export default function ActivityLog() {
                      {item.type === 'product' ? item.name : 
                       item.type === 'supplier' ? item.name : 
                       item.type === 'order' ? `BC: ${item.poNumber || 'N/A'}` : 
-                      item.type === 'cash' ? `Montant: ${item.amount} DA` : item.displayName}
+                      item.type === 'cash' ? `Montant: ${item.amount} DA` : 
+                      item.type === 'stock_movement' ? `${item.productName} (${item.quantity > 0 ? '+' : ''}${item.quantity})` : 
+                      item.displayName}
                   </h4>
                   <p className="text-xs text-slate-500 mt-1">
-                     {item.type === 'cash' ? 'Demandé par :' : 'Ajouté par :'} <span className="font-bold text-slate-700">{item.createdBy || item.buyerName || item.requesterName || 'Administrateur'}</span>
+                     {item.type === 'cash' ? 'Demandé par :' : item.type === 'stock_movement' ? 'Par :' : 'Ajouté par :'} <span className="font-bold text-slate-700">{item.createdBy || item.buyerName || item.requesterName || 'Administrateur'}</span>
                   </p>
                </div>
              </motion.div>

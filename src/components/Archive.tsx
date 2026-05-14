@@ -18,10 +18,12 @@ export default function Archive() {
 
     let unsubDa: any;
     let unsubPo: any;
+    let unsubIntl: any;
 
     const fallback = () => {
       if (unsubDa) unsubDa();
       if (unsubPo) unsubPo();
+      if (unsubIntl) unsubIntl();
 
       const fallbackDa = query(collection(db, 'purchase_requests'), where('tenantId', '==', tenantId));
       unsubDa = onSnapshot(fallbackDa, snap => {
@@ -33,6 +35,12 @@ export default function Archive() {
       unsubPo = onSnapshot(fallbackPo, snap => {
         const list = snap.docs.map(d => ({ id: d.id, type: 'PO', ...d.data() })).filter((d: any) => ['archived', 'cancelled', 'done'].includes(d.status));
         setItems(prev => [...prev.filter(p => p.type !== 'PO'), ...list].sort((a,b) => b.createdAt?.localeCompare(a.createdAt)));
+      });
+      
+      const fallbackIntl = query(collection(db, 'intl_purchases'), where('tenantId', '==', tenantId));
+      unsubIntl = onSnapshot(fallbackIntl, snap => {
+        const list = snap.docs.map(d => ({ id: d.id, type: 'INTL', ...d.data() })).filter((d: any) => ['completed', 'archived'].includes(d.status));
+        setItems(prev => [...prev.filter(p => p.type !== 'INTL'), ...list].sort((a,b) => b.createdAt?.localeCompare(a.createdAt)));
         setLoading(false);
       });
     };
@@ -56,7 +64,20 @@ export default function Archive() {
         const removedOthers = prev.filter(p => p.type !== 'PO');
         return [...removedOthers, ...poList].sort((a,b) => b.createdAt?.localeCompare(a.createdAt));
       });
-      setLoading(false);
+    }, (error) => {
+      console.error(error);
+      fallback();
+    });
+    
+    // Also query intl_purchases
+    const qIntl = query(collection(db, 'intl_purchases'), where('tenantId', '==', tenantId), where('status', 'in', ['completed', 'archived']));
+    unsubIntl = onSnapshot(qIntl, (snap) => {
+      const intlList = snap.docs.map(d => ({ id: d.id, type: 'INTL', ...d.data() }));
+      setItems(prev => {
+        const removedOthers = prev.filter(p => p.type !== 'INTL');
+        return [...removedOthers, ...intlList].sort((a,b) => b.createdAt?.localeCompare(a.createdAt));
+      });
+      setLoading(false); // set loading false here too just in case
     }, (error) => {
       console.error(error);
       fallback();
@@ -65,6 +86,7 @@ export default function Archive() {
     return () => {
       if (typeof unsubDa === 'function') unsubDa();
       if (typeof unsubPo === 'function') unsubPo();
+      if (typeof unsubIntl === 'function') unsubIntl();
     };
   }, [tenantId]);
 
@@ -85,7 +107,7 @@ export default function Archive() {
       doc.setTextColor(50, 50, 50);
       let y = 45;
       
-      doc.text(`Type de document : ${item.type === 'PO' ? 'Bon de Commande' : 'Demande d\'Achat'}`, 14, y); y += 8;
+      doc.text(`Type de document : ${item.type === 'PO' ? 'Bon de Commande' : item.type === 'INTL' ? 'Achat International' : 'Demande d\'Achat'}`, 14, y); y += 8;
       doc.text(`Référence : ${item.poNumber || item.daNumber}`, 14, y); y += 8;
       doc.text(`Statut final : ${item.status}`, 14, y); y += 8;
       doc.text(`Créé le : ${new Date(item.createdAt).toLocaleDateString('fr-FR')}`, 14, y); y += 8;
@@ -94,6 +116,14 @@ export default function Archive() {
         doc.text(`Fournisseur : ${item.supplierName}`, 14, y); y += 8;
         doc.text(`Acheteur : ${item.buyerName}`, 14, y); y += 8;
         doc.text(`Montant Total : ${item.totalAmount?.toLocaleString()} DZD`, 14, y); y += 8;
+      } else if (item.type === 'INTL') {
+        doc.text(`Fournisseur : ${item.supplierName}`, 14, y); y += 8;
+        doc.text(`Incoterm : ${item.incoterm || 'N/A'}`, 14, y); y += 8;
+        doc.text(`Mode de Transport : ${item.transportMethod || 'N/A'}`, 14, y); y += 8;
+        doc.text(`Méthode de Paiement : ${item.paymentMethod || 'N/A'}`, 14, y); y += 8;
+        doc.text(`Montant Total : ${item.totalAmount?.toLocaleString() || 0} ${item.currency || 'EUR'}`, 14, y); y += 8;
+        doc.text(`Transitaire : ${item.transitaire || 'N/A'}`, 14, y); y += 8;
+        doc.text(`N° Déclaration : ${item.numeroDeclaration || 'N/A'}`, 14, y); y += 8;
       } else {
         doc.text(`Créé par : ${item.createdBy}`, 14, y); y += 8;
       }
@@ -104,6 +134,14 @@ export default function Archive() {
           autoTable(doc, {
             startY: y,
             head: [['SKU', 'Produit', 'Qté']],
+            body: item.items.map((i: any) => [i.sku || '-', i.name, `${i.quantity} ${i.unit || 'pcs'}`]),
+            theme: 'grid',
+            headStyles: { fillColor: [19, 106, 168] }
+          });
+        } else if (item.type === 'INTL') {
+          autoTable(doc, {
+            startY: y,
+            head: [['Code/SKU', 'Produit', 'Qté']],
             body: item.items.map((i: any) => [i.sku || '-', i.name, `${i.quantity} ${i.unit || 'pcs'}`]),
             theme: 'grid',
             headStyles: { fillColor: [19, 106, 168] }
@@ -174,8 +212,8 @@ export default function Archive() {
               {filteredItems.map((item, idx) => (
                 <tr key={`${item.id}-${idx}`} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                   <td className="p-4">
-                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${item.type === 'PO' ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'}`}>
-                      {item.type === 'PO' ? 'Bon de Commande' : 'Demande d\'Achat'}
+                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${item.type === 'PO' ? 'bg-indigo-50 text-indigo-700' : item.type === 'INTL' ? 'bg-cyan-50 text-cyan-700' : 'bg-orange-50 text-orange-700'}`}>
+                      {item.type === 'PO' ? 'Bon de Commande' : item.type === 'INTL' ? 'Achat International' : 'Demande d\'Achat'}
                     </span>
                   </td>
                   <td className="p-4 font-bold text-slate-700">{item.poNumber || item.daNumber}</td>

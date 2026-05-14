@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot, addDoc, query, orderBy, deleteDoc, doc, updateDoc, where } from 'firebase/firestore';
-import { Plus, Search, Package, Trash2, X, Loader2, FileSpreadsheet, Tag, AlertTriangle, Edit3, ArrowRightLeft, UploadCloud } from 'lucide-react';
+import { collection, onSnapshot, addDoc, query, orderBy, deleteDoc, doc, updateDoc, where, getDoc } from 'firebase/firestore';
+import { Plus, Search, Package, Trash2, X, Loader2, FileSpreadsheet, Tag, AlertTriangle, Edit3, ArrowRightLeft, UploadCloud, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Products() {
-  const { user, tenantId } = useAuth();
+  const { user, tenantId, unitId, role } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,13 +15,37 @@ export default function Products() {
   const [formData, setFormData] = useState({ name: '', sku: '', category: '', unit: 'pcs', defaultPrice: 0, stockQuantity: 0, minStock: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Unit / Magasin State
+  const [units, setUnits] = useState<any[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('HQ');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Stock Adjustment State
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [adjustData, setAdjustData] = useState({ quantity: 0, type: 'add', note: '' });
 
   useEffect(() => {
+    if (unitId && (role === 'magasinier' || role === 'magasinier_central' || role === 'admin')) {
+      setSelectedUnitId(unitId);
+    }
+  }, [unitId, role]);
+
+  useEffect(() => {
     if (!tenantId) return;
+
+    const fetchUnits = async () => {
+      const docRef = doc(db, 'tenant_settings', tenantId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists() && docSnap.data().units) {
+        setUnits(docSnap.data().units);
+      }
+    };
+    fetchUnits();
+
     const q = query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snap) => {
       setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -30,6 +54,29 @@ export default function Products() {
     return () => unsubscribe();
   }, [tenantId]);
 
+  // Helper Functions for Stock View
+  const getStockForUnit = (product: any, uId: string) => {
+    if (uId === 'all') {
+      if (!product.unitStocks) return product.stockQuantity || 0;
+      return Object.values(product.unitStocks).reduce((acc: any, curr: any) => acc + (curr.qty || 0), 0) + (product.stockQuantity || 0); // Adding base stock if any
+    }
+    if (product.unitStocks && product.unitStocks[uId] !== undefined) {
+      return product.unitStocks[uId].qty;
+    }
+    // Backward compatibility if no units setup yet
+    if (uId === 'HQ' && !product.unitStocks) return product.stockQuantity || 0;
+    return 0;
+  };
+
+  const getMinStockForUnit = (product: any, uId: string) => {
+    if (uId === 'all') return product.minStock || 0;
+    if (product.unitStocks && product.unitStocks[uId] !== undefined) {
+      return product.unitStocks[uId].min || product.minStock || 0;
+    }
+    return product.minStock || 0;
+  };
+
+  // Rest of state management...
   const [error, setError] = useState<string | null>(null);
   const [loadingForm, setLoadingForm] = useState(false);
 
@@ -61,7 +108,12 @@ export default function Products() {
     setLoadingForm(true);
     setError(null);
     
-    let newQuantity = selectedProduct.stockQuantity || 0;
+    let currentQty = selectedProduct.unitStocks?.[selectedUnitId]?.qty;
+    if (currentQty === undefined) {
+      currentQty = selectedUnitId === 'HQ' ? (selectedProduct.stockQuantity || 0) : 0;
+    }
+    
+    let newQuantity = currentQty;
     const qty = Number(adjustData.quantity);
     
     if (adjustData.type === 'add') newQuantity += qty;
@@ -70,9 +122,25 @@ export default function Products() {
 
     try {
       await updateDoc(doc(db, 'products', selectedProduct.id), {
-        stockQuantity: newQuantity,
+        [`unitStocks.${selectedUnitId}.qty`]: newQuantity,
         lastStockUpdate: new Date().toISOString()
       });
+
+      await addDoc(collection(db, 'stock_movements'), {
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        productSku: selectedProduct.sku,
+        unitId: selectedUnitId,
+        tenantId: tenantId,
+        type: adjustData.type,
+        quantity: qty,
+        previousQuantity: currentQty,
+        newQuantity: newQuantity,
+        note: adjustData.note,
+        createdBy: user?.displayName || user?.email,
+        createdAt: new Date().toISOString(),
+      });
+
       setIsAdjustModalOpen(false);
       setSelectedProduct(null);
       setAdjustData({ quantity: 0, type: 'add', note: '' });
@@ -85,7 +153,11 @@ export default function Products() {
   };
 
   const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(products);
+    const worksheet = XLSX.utils.json_to_sheet(products.map(p => ({
+      ...p,
+      stockQuantity: getStockForUnit(p, selectedUnitId),
+      minStock: getMinStockForUnit(p, selectedUnitId)
+    })));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Catalogue");
     XLSX.writeFile(workbook, "Catalogue_Articles.xlsx");
@@ -106,7 +178,6 @@ export default function Products() {
         const data = XLSX.utils.sheet_to_json(ws);
 
         for (const row of data as any[]) {
-          // Expected columns: sku, name, category, unit, defaultPrice, stockQuantity, minStock (Fallback to empty/0)
           await addDoc(collection(db, 'products'), {
             sku: String(row.sku || row.SKU || row['Référence'] || ''),
             name: String(row.name || row.Désignation || row.Nom || ''),
@@ -133,16 +204,19 @@ export default function Products() {
   };
 
   const filtered = products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase()));
-  const alertProducts = products.filter(p => (p.stockQuantity || 0) <= (p.minStock || 0));
+  const alertProducts = filtered.filter(p => getStockForUnit(p, selectedUnitId) <= getMinStockForUnit(p, selectedUnitId));
+  
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedProducts = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-[#136AA8] tracking-tight">Catalogue Produits</h2>
-          <p className="text-sm text-gray-500 font-medium">Gestion des articles et nomenclatures</p>
+          <p className="text-sm text-gray-500 font-medium">Gestion des articles et stock par entité</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -172,11 +246,11 @@ export default function Products() {
           </div>
           <div>
             <h3 className="text-orange-800 font-black tracking-tight uppercase text-sm mb-1">Alertes de Stock ({alertProducts.length})</h3>
-            <p className="text-orange-700 text-xs font-medium mb-3">Certains articles ont atteint ou dépassé leur seuil d'alerte (Point de commande).</p>
+            <p className="text-orange-700 text-xs font-medium mb-3">Certains articles ont atteint ou dépassé leur seuil d'alerte dans l'unité sélectionnée.</p>
             <div className="flex flex-wrap gap-2">
               {alertProducts.slice(0, 5).map(p => (
                 <span key={p.id} className="px-3 py-1 bg-white/60 text-orange-800 rounded-lg text-[10px] font-bold border border-orange-200/50">
-                  {p.sku} - Reste: {p.stockQuantity} / Min: {p.minStock}
+                  {p.sku} - Reste: {getStockForUnit(p, selectedUnitId)} / Min: {getMinStockForUnit(p, selectedUnitId)}
                 </span>
               ))}
               {alertProducts.length > 5 && <span className="px-3 py-1 text-orange-800 text-[10px] font-bold">+{alertProducts.length - 5} autres</span>}
@@ -185,21 +259,42 @@ export default function Products() {
         </div>
       )}
 
-      <div className="flex items-center gap-4 bg-white px-5 py-3 rounded-2xl border border-slate-200 max-w-md shadow-sm group focus-within:ring-4 focus-within:ring-blue-50 focus-within:border-blue-200 transition-all">
-        <Search size={18} className="text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-        <input 
-          type="text" 
-          placeholder="Rechercher par nom ou SKU..." 
-          className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none font-medium placeholder-slate-300"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex-1 flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl group focus-within:ring-2 focus-within:ring-blue-100 transition-all w-full">
+          <Search size={18} className="text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+          <input 
+            type="text" 
+            placeholder="Rechercher par nom ou SKU..." 
+            className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none font-medium placeholder-slate-400"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+          />
+        </div>
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter size={16} className="text-slate-400 ml-1" />
+          <select 
+            value={selectedUnitId} 
+            onChange={(e) => setSelectedUnitId(e.target.value)}
+            disabled={role === 'magasinier'}
+            className="flex-1 sm:w-48 bg-slate-50 border-none px-4 py-2 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer disabled:opacity-50"
+          >
+            {role !== 'magasinier' && <option value="all">Global (Toutes Unités)</option>}
+            <option value="HQ">Siège Principal (HQ)</option>
+            {units.map(u => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#009CDA]" /></div>
       ) : (
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -216,7 +311,10 @@ export default function Products() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filtered.map(p => (
+                {paginatedProducts.map(p => {
+                  const stock = getStockForUnit(p, selectedUnitId);
+                  const min = getMinStockForUnit(p, selectedUnitId);
+                  return (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-5 py-5 font-mono text-xs font-bold text-slate-400 tracking-tighter uppercase">{p.sku}</td>
                     <td className="px-5 py-5 font-bold text-[#136AA8] uppercase text-sm">{p.name}</td>
@@ -226,12 +324,12 @@ export default function Products() {
                       </span>
                     </td>
                     <td className="px-5 py-5 text-center">
-                      <span className={`text-sm font-black font-mono px-3 py-1 rounded-lg ${p.stockQuantity <= (p.minStock || 0) && p.stockQuantity > 0 ? 'bg-orange-50 text-orange-600' : p.stockQuantity <= 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                        {p.stockQuantity || 0}
+                      <span className={`text-sm font-black font-mono px-3 py-1 rounded-lg ${stock <= min && stock > 0 ? 'bg-orange-50 text-orange-600' : stock <= 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                        {stock}
                       </span>
                     </td>
                     <td className="px-5 py-5 text-center">
-                      <span className="text-[11px] font-mono font-bold text-slate-400">{p.minStock || 0}</span>
+                      <span className="text-[11px] font-mono font-bold text-slate-400">{min}</span>
                     </td>
                     <td className="px-5 py-5 text-center">
                       <span className="text-[11px] font-bold text-slate-400 uppercase">{p.unit}</span>
@@ -240,35 +338,62 @@ export default function Products() {
                       {p.defaultPrice?.toLocaleString()}
                     </td>
                     <td className="px-5 py-5 text-center">
-                      {p.stockQuantity <= 0 ? (
+                      {stock <= 0 ? (
                         <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-[9px] font-bold uppercase tracking-widest">Rupture</span>
-                      ) : p.stockQuantity <= (p.minStock || 0) ? (
+                      ) : stock <= min ? (
                         <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-[9px] font-bold uppercase tracking-widest">Stock Alert</span>
                       ) : (
                         <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-widest">En Stock</span>
                       )}
                     </td>
-                    <td className="px-5 py-5 text-right flex justify-end gap-2">
-                       <button 
-                        onClick={() => {
-                          setSelectedProduct(p);
-                          setAdjustData({ quantity: 0, type: 'add', note: '' });
-                          setIsAdjustModalOpen(true);
-                        }}
-                        className="p-2 bg-blue-50 text-[#009CDA] rounded-lg transition-all hover:bg-blue-100 opacity-0 group-hover:opacity-100"
-                        title="Ajuster le Stock"
-                      >
-                        <ArrowRightLeft size={16} />
-                      </button>
-                      <button onClick={() => deleteDoc(doc(db, 'products', p.id))} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Supprimer">
-                        <Trash2 size={16} />
-                      </button>
+                    <td className="px-5 py-5 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                         onClick={() => {
+                           setSelectedProduct(p);
+                           setAdjustData({ quantity: 0, type: 'add', note: '' });
+                           setIsAdjustModalOpen(true);
+                         }}
+                         disabled={selectedUnitId === 'all'}
+                         className="p-2 bg-blue-50 text-[#009CDA] rounded-lg transition-all hover:bg-blue-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                         title={selectedUnitId === 'all' ? "Sélectionnez une unité d'abord" : "Ajuster le Stock"}
+                       >
+                         <ArrowRightLeft size={16} />
+                       </button>
+                       <button onClick={() => deleteDoc(doc(db, 'products', p.id))} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Supprimer">
+                         <Trash2 size={16} />
+                       </button>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
+          
+          {totalPages > 1 && (
+            <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50 mt-auto">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Page {currentPage} sur {totalPages}
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

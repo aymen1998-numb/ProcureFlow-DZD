@@ -5,12 +5,14 @@ import { useAuth } from '../hooks/useAuth';
 import { FileText, Plus, Search, Trash2, Link as LinkIcon, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (da: any) => void }) {
+export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: { onConvertToPO?: (da: any) => void, onConvertToIntlPO?: (da: any) => void }) {
   const { tenantId, role, unitId, user } = useAuth();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [units, setUnits] = useState<any[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<any[]>([]);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,12 +30,16 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
     };
     fetchUnits();
 
-    // Do not use complex compound queries here natively to avoid needing immediate indexes
-    // Fetch all relevant active requests and filter locally if 'magasinier'
+    // Fetch catalog products
+    const qProducts = query(collection(db, 'products'), where('tenantId', '==', tenantId));
+    const unsubscribeProducts = onSnapshot(qProducts, (snap) => {
+      setCatalogProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Fetch all requests and filter locally
     const q = query(
         collection(db, 'purchase_requests'), 
-        where('tenantId', '==', tenantId),
-        where('status', 'in', ['confirmed', 'partial', 'pending'])
+        where('tenantId', '==', tenantId)
     );
 
     const unsubscribe = onSnapshot(q, (snap) => {
@@ -57,8 +63,17 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
       handleFirestoreError(error, OperationType.GET, 'purchase_requests');
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      unsubscribeProducts();
+    };
   }, [tenantId, role, unitId]);
+
+  const [daUnitId, setDaUnitId] = useState('');
+
+  useEffect(() => {
+    if (unitId) setDaUnitId(unitId);
+  }, [unitId]);
 
   const handleCreateDA = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +90,7 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
       await addDoc(collection(db, 'purchase_requests'), {
         daNumber,
         tenantId,
-        unitId: unitId || 'HQ',
+        unitId: daUnitId || unitId || 'HQ',
         items: items.filter(i => i.name && i.quantity > 0),
         status: 'confirmed', // confirmed directly by magasinier
         createdBy: user?.displayName || user?.email,
@@ -105,10 +120,19 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
     }
   };
 
-  const filteredRequests = requests.filter(r => 
-    r.daNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.items?.some((i: any) => i.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredRequests = requests.filter(r => {
+    const matchesSearch = r.daNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.items?.some((i: any) => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    let matchesStatus = true;
+    if (statusFilter === 'active') {
+      matchesStatus = ['confirmed', 'partial', 'pending'].includes(r.status);
+    } else if (statusFilter !== 'all') {
+      matchesStatus = r.status === statusFilter;
+    }
+    
+    return matchesSearch && matchesStatus;
+  });
 
   const getUnitName = (uId: string) => {
     if (uId === 'HQ') return 'Siège Principal';
@@ -127,7 +151,7 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
           <p className="text-slate-500 font-medium mt-1">Gérez les besoins en matériel des différentes unités.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
@@ -135,10 +159,23 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
               placeholder="Rechercher une DA..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#009CDA] focus:border-transparent outline-none shadow-sm"
+              className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#009CDA] focus:border-transparent outline-none shadow-sm w-full sm:w-auto"
             />
           </div>
-          {(role === 'magasinier' || role === 'admin') && (
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#009CDA] focus:border-transparent outline-none shadow-sm font-medium"
+          >
+            <option value="active">En Cours (Actives)</option>
+            <option value="all">Toutes les demandes</option>
+            <option value="confirmed">Confirmées</option>
+            <option value="partial">Partielles</option>
+            <option value="pending">En Attente</option>
+            <option value="completed">Clôturées</option>
+            <option value="cancelled">Annulées</option>
+          </select>
+          {(role === 'magasinier' || role === 'magasinier_central' || role === 'admin') && (
             <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#136AA8] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#152945] transition-all shadow-md active:scale-95 text-sm uppercase tracking-wide">
               <Plus size={18} /> Nouvelle DA
             </button>
@@ -164,12 +201,25 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[#136AA8] font-black text-lg">{req.daNumber}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700">Confirmée</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      req.status === 'confirmed' ? 'bg-blue-50 text-blue-700' :
+                      req.status === 'cancelled' ? 'bg-red-50 text-red-700' :
+                      req.status === 'pending' ? 'bg-orange-50 text-orange-700' :
+                      req.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
+                      req.status === 'partial' ? 'bg-purple-50 text-purple-700' :
+                      'bg-gray-50 text-gray-700'
+                    }`}>
+                      {req.status === 'confirmed' ? 'Confirmée' : 
+                       req.status === 'cancelled' ? 'Annulée' :
+                       req.status === 'pending' ? 'En Attente' :
+                       req.status === 'completed' ? 'Clôturée' :
+                       req.status === 'partial' ? 'Partielle' : req.status}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium">Unité: <span className="text-slate-800 font-bold">{getUnitName(req.unitId)}</span></p>
                   <p className="text-[10px] text-slate-400 mt-1">Par {req.createdBy} le {new Date(req.createdAt).toLocaleDateString('fr-FR')}</p>
                 </div>
-                {(role === 'magasinier' || role === 'admin') && (
+                {(role === 'magasinier' || role === 'magasinier_central' || role === 'admin') && (
                   <button onClick={() => handleCancelDA(req.id)} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors" title="Annuler/Supprimer">
                     <Trash2 size={18} />
                   </button>
@@ -194,11 +244,18 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
               </div>
               
               {/* Buyer Actions */}
-              {(role === 'buyer' || role === 'admin') && (
-                <div className="bg-slate-50 p-4 border-t border-slate-100 mt-auto">
-                  <button onClick={() => onConvertToPO && onConvertToPO(req)} className="w-full flex items-center justify-center gap-2 bg-white border-2 border-[#136AA8] text-[#136AA8] py-2.5 rounded-xl font-bold hover:bg-[#136AA8] hover:text-white transition-all text-xs uppercase tracking-widest">
-                    <LinkIcon size={16} /> Générer Bon de Commande
-                  </button>
+              {['buyer', 'buyer_intl', 'admin'].includes(role || '') && (
+                <div className="bg-slate-50 p-4 border-t border-slate-100 mt-auto flex flex-col gap-2">
+                  {['buyer', 'admin'].includes(role || '') && (
+                    <button onClick={() => onConvertToPO && onConvertToPO(req)} className="w-full flex items-center justify-center gap-2 bg-white border-2 border-[#136AA8] text-[#136AA8] py-2.5 rounded-xl font-bold hover:bg-[#136AA8] hover:text-white transition-all text-xs uppercase tracking-widest">
+                      <LinkIcon size={16} /> Bon de Cmd Local
+                    </button>
+                  )}
+                  {['buyer_intl', 'admin'].includes(role || '') && (
+                    <button onClick={() => onConvertToIntlPO && onConvertToIntlPO(req)} className="w-full flex items-center justify-center gap-2 bg-[#136AA8] text-white py-2.5 rounded-xl font-bold hover:bg-blue-800 transition-all text-xs uppercase tracking-widest shadow-md">
+                      <LinkIcon size={16} /> Achat International
+                    </button>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -220,6 +277,21 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
                   <div className="p-4 sm:p-8 overflow-y-auto flex-1 space-y-6">
                     
                     <div className="space-y-4">
+                      {(role === 'admin' || role === 'magasinier_central') && (
+                        <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pour l'unité :</label>
+                          <select 
+                            value={daUnitId} 
+                            onChange={e => setDaUnitId(e.target.value)} 
+                            className="bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold flex-1"
+                          >
+                            <option value="HQ">Siège Principal (HQ)</option>
+                            {units.map(u => (
+                              <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center">
                         <h4 className="text-xs font-black uppercase tracking-widest text-[#136AA8]">Articles à demander</h4>
                         <button type="button" onClick={() => setItems([...items, { name: '', qtyInStock: 0, monthlyConsumption: 0, quantity: 1, category: '', unit: 'pcs' }])} className="text-xs font-bold text-[#009CDA] hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
@@ -232,7 +304,38 @@ export default function InternalRequests({ onConvertToPO }: { onConvertToPO?: (d
                           <div className="grid grid-cols-12 gap-3 flex-1">
                             <div className="col-span-12 sm:col-span-4">
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Désignation *</label>
-                              <input required value={item.name} onChange={e => { const newItems = [...items]; newItems[index].name = e.target.value; setItems(newItems); }} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:border-[#009CDA] focus:ring-1 focus:ring-[#009CDA] outline-none" placeholder="Nom de l'article" />
+                              <input 
+                                required 
+                                list="catalog-products"
+                                value={item.name} 
+                                onChange={e => { 
+                                  const newItems = [...items]; 
+                                  const val = e.target.value;
+                                  newItems[index].name = val; 
+                                  
+                                  // Find the selected product from the catalog
+                                  const selectedProduct = catalogProducts.find(p => p.name === val);
+                                  if (selectedProduct) {
+                                    const uId = daUnitId || unitId || 'HQ';
+                                    let stock = selectedProduct.unitStocks?.[uId]?.qty;
+                                    if (stock === undefined) {
+                                      stock = uId === 'HQ' ? (selectedProduct.stockQuantity || 0) : 0;
+                                    }
+                                    newItems[index].qtyInStock = stock;
+                                    newItems[index].unit = selectedProduct.unit || 'pcs';
+                                    newItems[index].category = selectedProduct.category || '';
+                                  }
+
+                                  setItems(newItems); 
+                                }} 
+                                className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:border-[#009CDA] focus:ring-1 focus:ring-[#009CDA] outline-none" 
+                                placeholder="Nom de l'article ou Sélectionner..." 
+                              />
+                              <datalist id="catalog-products">
+                                {catalogProducts.map(p => (
+                                  <option key={p.id} value={p.name} />
+                                ))}
+                              </datalist>
                             </div>
                             <div className="col-span-4 sm:col-span-2">
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Stock</label>

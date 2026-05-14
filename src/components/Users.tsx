@@ -190,8 +190,10 @@ export default function Users() {
                   >
                     <option value="admin">Administrateur</option>
                     <option value="finance">Finance</option>
-                    <option value="buyer">Acheteur</option>
-                    <option value="magasinier">Magasinier</option>
+                    <option value="buyer">Acheteur Local</option>
+                    <option value="buyer_intl">Acheteur International</option>
+                    <option value="magasinier">Magasinier (Unité)</option>
+                    <option value="magasinier_central">Magasinier Central</option>
                   </select>
                 </div>
               </div>
@@ -237,8 +239,10 @@ export default function Users() {
                     <select required value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:bg-white transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200">
                       <option value="admin">Administrateur</option>
                       <option value="finance">Finance</option>
-                      <option value="buyer">Acheteur</option>
-                      <option value="magasinier">Magasinier (Responsable Magasin)</option>
+                      <option value="buyer">Acheteur Local</option>
+                      <option value="buyer_intl">Acheteur International</option>
+                      <option value="magasinier">Magasinier (Unité)</option>
+                      <option value="magasinier_central">Magasinier Central</option>
                     </select>
                   </div>
                   {formData.role === 'magasinier' && (

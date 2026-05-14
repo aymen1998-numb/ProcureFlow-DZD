@@ -5,7 +5,7 @@ import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<'admin' | 'buyer' | 'finance' | 'magasinier' | null>(null);
+  const [role, setRole] = useState<'admin' | 'buyer' | 'buyer_intl' | 'finance' | 'magasinier' | 'magasinier_central' | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

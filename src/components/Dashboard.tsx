@@ -59,12 +59,13 @@ import Transfers from './Transfers';
 import CashRequests from './CashRequests';
 
 import InternalRequests from './InternalRequests';
+import IntlPurchases from './IntlPurchases';
 import Archive from './Archive';
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const { user, role, tenantId, unitId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'intl_purchases' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings'>('dashboard');
   const [pos, setPos] = useState<PO[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +80,36 @@ export default function Dashboard() {
       unitId: daObj.unitId
     });
     setIsModalOpen(true);
+  };
+
+  const handleConvertDAToIntlPO = async (daObj: any) => {
+    if (!tenantId) return;
+    try {
+      const { addDoc, collection } = await import('firebase/firestore');
+      await addDoc(collection(db, 'intl_purchases'), {
+        tenantId,
+        daId: daObj.id,
+        daNumber: daObj.daNumber,
+        unitId: daObj.unitId,
+        items: daObj.items,
+        status: 'proforma',
+        paymentMethod: '',
+        documents: {
+          facture: false,
+          bl: false,
+          certOrigin: false,
+          packingList: false
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      // Try to update DA to keep track that it's processing?
+      // For now just switch tab
+      setActiveTab('intl_purchases');
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la création de l'achat international");
+    }
   };
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,29 +129,40 @@ export default function Dashboard() {
       q = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), where('buyerId', '==', user.uid), orderBy('createdAt', 'desc'));
     } else if (role === 'magasinier' && unitId) {
       q = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), where('unit.id', '==', unitId), orderBy('createdAt', 'desc'));
+    } else if (role === 'buyer_intl') {
+      // Intl buyer doesn't see local POs
+      setPos([]);
+      setLoading(false);
+      // Wait for unsub check below...
     }
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setPos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PO[]);
+    let unsubscribe = () => {};
+    if (role === 'buyer_intl') {
+      setPos([]);
       setLoading(false);
-    }, (error) => {
-      if (error.message.includes('index')) {
-        const qFallback = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId));
-        onSnapshot(qFallback, (snap2) => {
-          let docs = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PO[];
-          if (role === 'buyer') {
-            docs = docs.filter(d => d.buyerId === user.uid);
-          } else if (role === 'magasinier' && unitId) {
-            docs = docs.filter((d: any) => d.unit && d.unit.id === unitId);
-          }
-          docs.sort((a,b) => b.createdAt.localeCompare(a.createdAt));
-          setPos(docs);
-          setLoading(false);
-        });
-      } else {
-        console.error(error);
-      }
-    });
+    } else {
+      unsubscribe = onSnapshot(q, (snap) => {
+        setPos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PO[]);
+        setLoading(false);
+      }, (error) => {
+        if (error.message.includes('index')) {
+          const qFallback = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId));
+          unsubscribe = onSnapshot(qFallback, (snap2) => {
+            let docs = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PO[];
+            if (role === 'buyer') {
+              docs = docs.filter(d => d.buyerId === user.uid);
+            } else if (role === 'magasinier' && unitId) {
+              docs = docs.filter((d: any) => d.unit && d.unit.id === unitId);
+            }
+            docs.sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+            setPos(docs);
+            setLoading(false);
+          });
+        } else {
+          console.error(error);
+        }
+      });
+    }
 
     const productsUnsub = onSnapshot(query(collection(db, 'products'), where('tenantId', '==', tenantId)), (snap) => {
       setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -160,7 +202,12 @@ export default function Dashboard() {
   const stats = [
     { label: 'Commandes Totales', value: pos.length, icon: Package, color: 'blue' },
     { label: 'En attente Livraison', value: pos.filter(p => !['delivered', 'closed'].includes(p.status)).length, icon: Truck, color: 'orange' },
-    { label: 'Alertes Stock', value: products.filter(p => p.stockQuantity <= (p.minStock || 0)).length, icon: AlertTriangle, color: 'red' },
+    { label: 'Alertes Stock', value: products.filter(p => {
+      const uId = unitId || 'HQ';
+      const stock = (p.unitStocks && p.unitStocks[uId] !== undefined) ? p.unitStocks[uId].qty : (uId === 'HQ' ? (p.stockQuantity || 0) : 0);
+      const min = (p.unitStocks && p.unitStocks[uId] !== undefined && p.unitStocks[uId].min !== undefined) ? p.unitStocks[uId].min : (p.minStock || 0);
+      return stock <= min && stock > 0;
+    }).length, icon: AlertTriangle, color: 'red' },
     { label: 'Dépenses Totales', value: `${pos.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0).toLocaleString()} DZD`, icon: TrendingUp, color: 'emerald' }
   ];
 
@@ -202,6 +249,14 @@ export default function Dashboard() {
           >
             <FileText size={16} /> {t('da')}
           </button>
+          {['admin', 'buyer_intl'].includes(role || '') && (
+            <button 
+              onClick={() => { setActiveTab('intl_purchases'); setIsMobileMenuOpen(false); }}
+              className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'intl_purchases' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+            >
+              <Globe size={16} /> {t('intl_purchases')}
+            </button>
+          )}
           <button 
             onClick={() => { setActiveTab('transfers'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'transfers' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
@@ -462,7 +517,8 @@ export default function Dashboard() {
               </motion.div>
             )}
 
-            {activeTab === 'da' && <motion.div key="da" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><InternalRequests onConvertToPO={handleConvertDAToPO} /></motion.div>}
+            {activeTab === 'da' && <motion.div key="da" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><InternalRequests onConvertToPO={handleConvertDAToPO} onConvertToIntlPO={handleConvertDAToIntlPO} /></motion.div>}
+            {activeTab === 'intl_purchases' && <motion.div key="intl_purchases" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><IntlPurchases /></motion.div>}
             {activeTab === 'archive' && <motion.div key="archive" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Archive /></motion.div>}
             {activeTab === 'cash' && <motion.div key="cash" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><CashRequests /></motion.div>}
             {activeTab === 'transfers' && <motion.div key="transfers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Transfers /></motion.div>}
