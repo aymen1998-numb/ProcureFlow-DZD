@@ -12,7 +12,7 @@ import TransferDetails from './components/TransferDetails';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
 
   if (loading) {
     return (
@@ -36,7 +36,7 @@ export default function App() {
           />
           <Route 
             path="/purchase/:id" 
-            element={user ? <PODetails /> : <Navigate to="/login" />} 
+            element={user ? (role === 'magasinier' ? <Navigate to="/" /> : <PODetails />) : <Navigate to="/login" />} 
           />
           <Route 
             path="/transfers/:id" 

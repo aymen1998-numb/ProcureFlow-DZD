@@ -61,18 +61,15 @@ service cloud.firestore {
       allow delete: if isSignedIn() && existing().tenantId == getTenantId();
 
       match /deliveries/{dnId} {
-        allow read: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
-        allow write: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+        allow read, write: if isSignedIn();
       }
 
       match /status_history/{historyId} {
-        allow read: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
-        allow write: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+        allow read, write: if isSignedIn();
       }
 
       match /invoices/{invoiceId} {
-        allow read: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
-        allow write: if isSignedIn() && get(/databases/$(database)/documents/purchase_orders/$(poId)).data.tenantId == getTenantId();
+        allow read, write: if isSignedIn();
       }
     }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
 import { 
   BarChart3, 
@@ -66,8 +66,16 @@ export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const { user, role, tenantId, unitId } = useAuth();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'intl_purchases' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings'>('dashboard');
+  
+  useEffect(() => {
+    if (role === 'magasinier') {
+      setActiveTab('products');
+    }
+  }, [role]);
   const [pos, setPos] = useState<PO[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [tenantUnits, setTenantUnits] = useState<any[]>([]);
+  const [dashboardUnitId, setDashboardUnitId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialPOData, setInitialPOData] = useState<any>(null);
@@ -134,6 +142,18 @@ export default function Dashboard() {
       setPos([]);
       setLoading(false);
       // Wait for unsub check below...
+    } else if (role === 'admin') {
+      getDoc(doc(db, 'tenant_settings', tenantId)).then(snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.units) {
+            setTenantUnits(data.units);
+          } else if (data.locations) {
+            const locs = (data.locations || 'Siège Principal').split(',').map((l: string) => l.trim()).filter(Boolean);
+            setTenantUnits(locs.map((name: string, i: number) => ({ id: `legacy-${i}`, name })));
+          }
+        }
+      });
     }
 
     let unsubscribe = () => {};
@@ -199,16 +219,41 @@ export default function Dashboard() {
     }
   };
 
+  const filteredPos = pos.filter(p => {
+    if (role === 'admin' && dashboardUnitId !== 'all') {
+      return p.unit?.id === dashboardUnitId;
+    }
+    return true;
+  });
+
   const stats = [
-    { label: 'Commandes Totales', value: pos.length, icon: Package, color: 'blue' },
-    { label: 'En attente Livraison', value: pos.filter(p => !['delivered', 'closed'].includes(p.status)).length, icon: Truck, color: 'orange' },
+    { label: 'Commandes Totales', value: filteredPos.length, icon: Package, color: 'blue' },
+    { label: 'En attente Livraison', value: filteredPos.filter(p => !['delivered', 'closed'].includes(p.status)).length, icon: Truck, color: 'orange' },
     { label: 'Alertes Stock', value: products.filter(p => {
-      const uId = unitId || 'HQ';
-      const stock = (p.unitStocks && p.unitStocks[uId] !== undefined) ? p.unitStocks[uId].qty : (uId === 'HQ' ? (p.stockQuantity || 0) : 0);
-      const min = (p.unitStocks && p.unitStocks[uId] !== undefined && p.unitStocks[uId].min !== undefined) ? p.unitStocks[uId].min : (p.minStock || 0);
-      return stock <= min && stock > 0;
+      if (role === 'admin' && dashboardUnitId === 'all') {
+        let hasAlert = false;
+        // Check HQ
+        const hqStock = p.stockQuantity || 0;
+        const hqMin = p.minStock || 0;
+        if (hqStock <= hqMin && hqStock > 0) hasAlert = true;
+        
+        // Check other units
+        if (p.unitStocks) {
+          Object.keys(p.unitStocks).forEach(uid => {
+            const uStock = p.unitStocks[uid].qty || 0;
+            const uMin = p.unitStocks[uid].min || 0;
+            if (uStock <= uMin && uStock > 0) hasAlert = true;
+          });
+        }
+        return hasAlert;
+      } else {
+        const uId = (role === 'admin' && dashboardUnitId !== 'all') ? dashboardUnitId : (unitId || 'HQ');
+        const stock = (p.unitStocks && p.unitStocks[uId] !== undefined) ? p.unitStocks[uId].qty : (uId === 'HQ' ? (p.stockQuantity || 0) : 0);
+        const min = (p.unitStocks && p.unitStocks[uId] !== undefined && p.unitStocks[uId].min !== undefined) ? p.unitStocks[uId].min : (p.minStock || 0);
+        return stock <= min && stock > 0;
+      }
     }).length, icon: AlertTriangle, color: 'red' },
-    { label: 'Dépenses Totales', value: `${pos.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0).toLocaleString()} DZD`, icon: TrendingUp, color: 'emerald' }
+    { label: 'Dépenses Totales', value: `${filteredPos.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0).toLocaleString()} DZD`, icon: TrendingUp, color: 'emerald' }
   ];
 
   return (
@@ -228,7 +273,7 @@ export default function Dashboard() {
              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-teal-400 rounded-lg flex items-center justify-center text-white shadow-inner border border-white/20">
                <Box size={18} strokeWidth={2.5} />
              </div>
-             <span className="font-bold text-lg tracking-tight text-white uppercase italic">ProcuraFlow</span>
+             <span className="font-bold text-lg tracking-tight text-white uppercase italic">Dashboard</span>
           </div>
           <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-white/70 hover:text-white">
             <X size={20} />
@@ -237,12 +282,14 @@ export default function Dashboard() {
         
         <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
           <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Menu Principal</div>
-          <button 
-            onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
-          >
-            <LayoutDashboard size={16} /> {t('dashboard')}
-          </button>
+          {role !== 'magasinier' && (
+            <button 
+              onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
+              className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+            >
+              <LayoutDashboard size={16} /> {t('dashboard')}
+            </button>
+          )}
           <button 
             onClick={() => { setActiveTab('da'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'da' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
@@ -257,17 +304,19 @@ export default function Dashboard() {
               <Globe size={16} /> {t('intl_purchases')}
             </button>
           )}
+          {role !== 'magasinier' && (
+            <button 
+              onClick={() => { setActiveTab('suppliers'); setIsMobileMenuOpen(false); }}
+              className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'suppliers' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+            >
+              <Users size={16} /> {t('suppliers')}
+            </button>
+          )}
           <button 
             onClick={() => { setActiveTab('transfers'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'transfers' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
             <ArrowRightLeft size={16} /> {t('transfers')}
-          </button>
-          <button 
-            onClick={() => { setActiveTab('suppliers'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'suppliers' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
-          >
-            <Users size={16} /> {t('suppliers')}
           </button>
           <button 
             onClick={() => { setActiveTab('products'); setIsMobileMenuOpen(false); }}
@@ -276,32 +325,33 @@ export default function Dashboard() {
             <Box size={16} /> {t('products')}
           </button>
           <button 
-            onClick={() => { setActiveTab('analytics'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'analytics' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
-          >
-            <BarChart3 size={16} /> {t('analytics')}
-          </button>
-          
-          <button 
-            onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
-          >
-            <Clock size={16} /> {t('history')}
-          </button>
-
-          <button 
-            onClick={() => { setActiveTab('archive'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'archive' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
-          >
-            <ArchiveIcon size={16} /> {t('archive')}
-          </button>
-
-          <button 
             onClick={() => { setActiveTab('cash'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'cash' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
             <Coins size={16} /> {t('cash_requests')}
           </button>
+          {role !== 'magasinier' && (
+            <>
+              <button 
+                onClick={() => { setActiveTab('analytics'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'analytics' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <BarChart3 size={16} /> {t('analytics')}
+              </button>
+              <button 
+                onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <Clock size={16} /> {t('history')}
+              </button>
+              <button 
+                onClick={() => { setActiveTab('archive'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'archive' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <ArchiveIcon size={16} /> {t('archive')}
+              </button>
+            </>
+          )}
           
           {role === 'admin' && (
             <>
@@ -375,26 +425,30 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2 lg:gap-3 ml-2 lg:ml-0">
-            <button 
-              onClick={() => setIsSupplierModalOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-md font-bold text-[11px] transition-all border border-white/10 uppercase tracking-wide"
-            >
-              <Users size={14} />
-              Nouveau Fournisseur
-            </button>
-            <button onClick={() => {
-              const worksheet = XLSX.utils.json_to_sheet(pos);
-              const workbook = XLSX.utils.book_new();
-              XLSX.utils.book_append_sheet(workbook, worksheet, "PurchaseOrders");
-              XLSX.writeFile(workbook, "Rapport_Commandes.xlsx");
-            }} className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-md font-bold text-[11px] transition-all border border-white/10 uppercase tracking-wide">
-              <FileSpreadsheet size={14} />
-              Exporter
-            </button>
-            <button onClick={() => setIsModalOpen(true)} className="bg-[#3B82F6] hover:bg-[#009CDA] text-white px-3 lg:px-4 py-1.5 rounded-md font-bold flex items-center justify-center text-[10px] lg:text-[11px] transition-all shadow-md uppercase tracking-wide whitespace-nowrap">
-              <Plus size={14} className="sm:hidden" />
-              <span className="hidden sm:inline">Nouveau Bon de Commande</span>
-            </button>
+            {role !== 'magasinier' && (
+              <>
+                <button 
+                  onClick={() => setIsSupplierModalOpen(true)}
+                  className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-md font-bold text-[11px] transition-all border border-white/10 uppercase tracking-wide"
+                >
+                  <Users size={14} />
+                  Nouveau Fournisseur
+                </button>
+                <button onClick={() => {
+                  const worksheet = XLSX.utils.json_to_sheet(pos);
+                  const workbook = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(workbook, worksheet, "PurchaseOrders");
+                  XLSX.writeFile(workbook, "Rapport_Commandes.xlsx");
+                }} className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-md font-bold text-[11px] transition-all border border-white/10 uppercase tracking-wide">
+                  <FileSpreadsheet size={14} />
+                  Exporter
+                </button>
+                <button onClick={() => setIsModalOpen(true)} className="bg-[#3B82F6] hover:bg-[#009CDA] text-white px-3 lg:px-4 py-1.5 rounded-md font-bold flex items-center justify-center text-[10px] lg:text-[11px] transition-all shadow-md uppercase tracking-wide whitespace-nowrap">
+                  <Plus size={14} className="sm:hidden" />
+                  <span className="hidden sm:inline">Nouveau Bon de Commande</span>
+                </button>
+              </>
+            )}
           </div>
         </header>
 
@@ -407,6 +461,22 @@ export default function Dashboard() {
                     <h2 className="text-2xl font-bold text-[#136AA8] tracking-tight">Tableau de Bord</h2>
                     <p className="text-sm text-gray-500 font-medium">Surveillance des opérations d'achat locale</p>
                   </div>
+                  {role === 'admin' && (
+                    <div className="flex items-center gap-2">
+                       <span className="text-sm font-bold text-gray-500">Unité:</span>
+                       <select 
+                         value={dashboardUnitId}
+                         onChange={(e) => setDashboardUnitId(e.target.value)}
+                         className="bg-white border outline-none border-gray-200 text-[#136AA8] text-sm rounded-lg block w-48 p-2 font-bold"
+                       >
+                         <option value="all">Toutes les unités</option>
+                         <option value="HQ">Siège Principal (HQ)</option>
+                         {tenantUnits.map(u => (
+                           <option key={u.id} value={u.id}>{u.name}</option>
+                         ))}
+                       </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -463,7 +533,7 @@ export default function Dashboard() {
                   
                   {loading ? (
                     <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#009CDA]" /></div>
-                  ) : pos.length === 0 ? (
+                  ) : filteredPos.length === 0 ? (
                     <div className="bg-white rounded-2xl p-20 text-center border border-gray-200 shadow-sm">
                       <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
                         <Package size={28} className="text-gray-300" />
@@ -473,7 +543,7 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {pos
+                      {filteredPos
                         .filter(p => {
                           const matchesSearch = (p.poNumber||'').toLowerCase().includes(searchTerm.toLowerCase()) || 
                                               (p.supplierName||'').toLowerCase().includes(searchTerm.toLowerCase());

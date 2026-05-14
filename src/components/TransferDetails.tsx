@@ -140,7 +140,7 @@ export default function TransferDetails() {
       
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text("Généré via ProcuraFlow - Gestion d'Entrepôt", 14, 280);
+      doc.text("Généré via Dashboard - Gestion d'Entrepôt", 14, 280);
       
       doc.save(`${transfer.transferNumber}.pdf`);
     } catch (err) {

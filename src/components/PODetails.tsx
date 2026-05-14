@@ -361,7 +361,7 @@ export default function PODetails() {
       
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text("Généré via ProcuraFlow - Système de Gestion d'Entrepôt et des Achats", 14, 280);
+      doc.text("Généré via Dashboard - Système de Gestion d'Entrepôt et des Achats", 14, 280);
       doc.setTextColor(59, 130, 246);
       doc.textWithLink("App Developed by Benouasser Aymen Chamssedine (LinkedIn)", 14, 285, { url: 'https://www.linkedin.com/in/benouasser-aymen-chamssedine-93a806197?utm_source=share_via&utm_content=profile&utm_medium=member_android' });
       
@@ -411,7 +411,7 @@ export default function PODetails() {
       
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text("Généré via ProcuraFlow", 14, 280);
+      doc.text("Généré via Dashboard", 14, 280);
       doc.setTextColor(59, 130, 246);
       doc.textWithLink("App Developed by Benouasser Aymen Chamssedine (LinkedIn)", 14, 285, { url: 'https://www.linkedin.com/in/benouasser-aymen-chamssedine-93a806197?utm_source=share_via&utm_content=profile&utm_medium=member_android' });
       
@@ -466,7 +466,7 @@ export default function PODetails() {
       
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text("Généré via ProcuraFlow", 14, 280);
+      doc.text("Généré via Dashboard", 14, 280);
       doc.setTextColor(59, 130, 246);
       doc.textWithLink("App Developed by Benouasser Aymen Chamssedine (LinkedIn)", 14, 285, { url: 'https://www.linkedin.com/in/benouasser-aymen-chamssedine-93a806197?utm_source=share_via&utm_content=profile&utm_medium=member_android' });
       

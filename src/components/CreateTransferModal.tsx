@@ -6,7 +6,7 @@ import { X, Loader2, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function CreateTransferModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-  const { tenantId, user } = useAuth();
+  const { tenantId, user, role, unitId } = useAuth();
   const [locations, setLocations] = useState<string[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,11 +24,20 @@ export default function CreateTransferModal({ isOpen, onClose }: { isOpen: boole
       getDocs(query(collection(db, 'tenant_settings'), where('__name__', '==', tenantId))).then(snap => {
         if (!snap.empty) {
           const data = snap.docs[0].data();
+          let currentUnitName = '';
           if (data.units && data.units.length > 0) {
              setLocations(data.units.map((u: any) => u.name));
+             const f = data.units.find((u: any) => u.id === unitId);
+             if (f) currentUnitName = f.name;
           } else {
              const locs = data.locations || '';
-             setLocations(locs.split(',').map((l: string) => l.trim()).filter(Boolean));
+             const locArray = locs.split(',').map((l: string) => l.trim()).filter(Boolean);
+             setLocations(locArray);
+          }
+          if (unitId === 'HQ') currentUnitName = 'Siège Principal';
+          
+          if (role === 'magasinier' && unitId && currentUnitName) {
+             setFormData(prev => ({...prev, sourceLocation: currentUnitName}));
           }
         }
       });
@@ -112,7 +121,7 @@ export default function CreateTransferModal({ isOpen, onClose }: { isOpen: boole
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Usine/Dépôt d'Origine</label>
-              <select required value={formData.sourceLocation} onChange={(e) => setFormData({...formData, sourceLocation: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+              <select disabled={role === 'magasinier'} required value={formData.sourceLocation} onChange={(e) => setFormData({...formData, sourceLocation: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:opacity-50">
                 <option value="">Sélectionner l'origine...</option>
                 {locations.map(l => <option key={`src-${l}`} value={l}>{l}</option>)}
               </select>

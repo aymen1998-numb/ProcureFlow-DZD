@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, getDocs, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { Plus, ArrowRightLeft, Search, Loader2 } from 'lucide-react';
@@ -7,8 +7,9 @@ import CreateTransferModal from './CreateTransferModal';
 import { useNavigate } from 'react-router-dom';
 
 export default function Transfers() {
-  const { tenantId } = useAuth();
+  const { tenantId, role, unitId } = useAuth();
   const [transfers, setTransfers] = useState<any[]>([]);
+  const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,6 +17,20 @@ export default function Transfers() {
 
   useEffect(() => {
     if (!tenantId) return;
+
+    // Fetch units to know current unit's name
+    getDocs(query(collection(db, 'tenant_settings'), where('__name__', '==', tenantId))).then(snap => {
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        if (data.units && data.units.length > 0) {
+           setUnits(data.units);
+        } else {
+           const locs = data.locations || '';
+           setUnits(locs.split(',').map((l: string, i: number) => ({ id: `legacy-${i}`, name: l.trim() })).filter((u: any) => u.name));
+        }
+      }
+    });
+
     const q = query(collection(db, 'transfers'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snap) => {
       setTransfers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -24,11 +39,19 @@ export default function Transfers() {
     return () => unsubscribe();
   }, [tenantId]);
 
-  const filteredTransfers = transfers.filter(t => 
-    t.transferNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.sourceLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.destLocation?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const currentUnitName = unitId === 'HQ' ? 'Siège Principal' : (units.find(u => u.id === unitId)?.name || unitId);
+
+  const filteredTransfers = transfers.filter(t => {
+    const matchesSearch = t.transferNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          t.sourceLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          t.destLocation?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (role === 'magasinier' && unitId) {
+      const matchesUnit = t.sourceLocation === currentUnitName || t.destLocation === currentUnitName;
+      return matchesSearch && matchesUnit;
+    }
+    return matchesSearch;
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

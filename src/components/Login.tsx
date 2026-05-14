@@ -52,7 +52,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-[1.5rem] bg-[#136AA8] text-white shadow-xl mb-6 ring-8 ring-slate-50">
             <Box size={40} />
           </div>
-          <h1 className="text-4xl font-bold text-[#136AA8] tracking-tight mb-2">ProcuraFlow</h1>
+          <h1 className="text-4xl font-bold text-[#136AA8] tracking-tight mb-2">Dashboard</h1>
           <p className="text-slate-500 font-medium">Système de Gestion d'Entrepôt et des Achats</p>
         </div>
 
