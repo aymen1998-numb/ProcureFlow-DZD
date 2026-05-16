@@ -89,7 +89,7 @@ export default function Settings() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId || role !== 'admin') return;
+    if (!tenantId || !['admin', 'superadmin'].includes(role || '')) return;
     
     setSaving(true);
     setMessage(null);
@@ -117,7 +117,7 @@ export default function Settings() {
     );
   }
 
-  if (role !== 'admin') {
+  if (!['admin', 'superadmin'].includes(role || '')) {
     return (
       <div className="p-8 text-center text-slate-500">
         Vous n'avez pas l'autorisation d'accéder à cette page.

@@ -197,7 +197,9 @@ export default function Suppliers() {
     }
   };
 
-  const filtered = suppliers.filter(s => (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = React.useMemo(() => {
+    return suppliers.filter(s => (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [suppliers, searchTerm]);
 
   return (
     <div className="space-y-8">
@@ -227,7 +229,7 @@ export default function Suppliers() {
             <FileSpreadsheet size={16} />
             Exporter Excel
           </button>
-          {role === 'admin' && (
+          {['admin', 'superadmin'].includes(role || '') && (
             <button onClick={openCreateModal} className="flex items-center gap-2 bg-[#3B82F6] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#009CDA] shadow-lg shadow-blue-100 transition-all text-xs uppercase tracking-widest">
               <Plus size={18} />
               Ajouter Fournisseur
@@ -248,7 +250,7 @@ export default function Suppliers() {
           />
         </div>
 
-        {role === 'admin' && (
+        {['admin', 'superadmin'].includes(role || '') && (
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
@@ -281,7 +283,7 @@ export default function Suppliers() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map(s => (
             <motion.div layout key={s.id} className={`bg-white p-7 rounded-[2rem] border ${selectedSuppliers.includes(s.id) ? 'border-blue-400 shadow-md ring-4 ring-blue-50' : 'border-slate-100 shadow-sm'} hover:shadow-xl transition-all group relative overflow-hidden`}>
-              {role === 'admin' && (
+              {['admin', 'superadmin'].includes(role || '') && (
                 <div className="absolute top-0 right-0 p-6 flex gap-2 items-center z-10 bg-white/80 backdrop-blur-sm rounded-bl-3xl">
                   <input 
                     type="checkbox"
@@ -294,7 +296,7 @@ export default function Suppliers() {
                   <button onClick={(e) => handleDelete(s.id, e)} className="text-slate-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg shadow-sm bg-white border border-slate-100"><Trash2 size={16} /></button>
                 </div>
               )}
-              <div className="flex items-center gap-4 mb-6 cursor-pointer" onClick={() => role === 'admin' && toggleSelection(s.id)}>
+              <div className="flex items-center gap-4 mb-6 cursor-pointer" onClick={() => ['admin', 'superadmin'].includes(role || '') && toggleSelection(s.id)}>
                 <div className="w-14 h-14 bg-slate-50 text-[#136AA8] rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-[#136AA8] group-hover:text-white transition-all duration-500"><Building2 size={24} /></div>
                 <div className="min-w-0 pr-10">
                   <h3 className="text-lg font-black text-[#136AA8] leading-tight truncate uppercase">{s.name || <span className="text-red-400 italic">SANS NOM</span>}</h3>

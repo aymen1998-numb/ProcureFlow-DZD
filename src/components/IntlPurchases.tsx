@@ -128,10 +128,12 @@ export default function IntlPurchases() {
     }
   };
 
-  const filteredPurchases = purchases.filter(p => 
-    (p.daNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPurchases = React.useMemo(() => {
+    return purchases.filter(p => 
+      (p.daNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [purchases, searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -153,7 +155,7 @@ export default function IntlPurchases() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          {['admin', 'buyer_intl'].includes(role || '') && (
+          {['admin', 'superadmin', 'buyer_intl'].includes(role || '') && (
             <button
               onClick={handleCreateDirectIntlPurchase}
               className="bg-[#136AA8] text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-800 transition-all shadow-sm whitespace-nowrap"
@@ -226,7 +228,7 @@ export default function IntlPurchases() {
                       </span>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      {['admin', 'buyer'].includes(role || '') && !p.isConfirmed && (
+                      {['admin', 'superadmin', 'buyer'].includes(role || '') && !p.isConfirmed && (
                         <button onClick={(e) => handleDelete(p.id, e)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Supprimer">
                           <Trash2 size={16} />
                         </button>
@@ -675,7 +677,7 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
              <div className="text-slate-500 text-sm font-medium">
                Dossier confirmé et verrouillé.
              </div>
-             {['admin'].includes(role || '') && (
+             {['admin', 'superadmin'].includes(role || '') && (
                <button
                  onClick={onUnconfirm}
                  className="text-red-500 hover:text-white hover:bg-red-500 border border-red-500 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2 uppercase tracking-widest"

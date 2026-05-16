@@ -1,22 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, addDoc, query, orderBy, deleteDoc, doc, updateDoc, where, getDoc } from 'firebase/firestore';
-import { Plus, Search, Package, Trash2, X, Loader2, FileSpreadsheet, Tag, AlertTriangle, Edit3, ArrowRightLeft, UploadCloud, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Plus, Search, Trash2, X, Loader2, FileSpreadsheet, AlertTriangle, ArrowRightLeft, UploadCloud, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../hooks/useAuth';
 
-export default function Products() {
+export default function RawMaterials() {
   const { user, tenantId, unitId, role } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ name: '', sku: '', category: '', unit: 'pcs', defaultPrice: 0, stockQuantity: 0, minStock: 0, type: 'product' });
+  const [formData, setFormData] = useState({ name: '', sku: '', category: 'Matière Première', unit: 'kg', defaultPrice: 0, stockQuantity: 0, minStock: 0, type: 'raw_material' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Unit / Magasin State
   const [units, setUnits] = useState<any[]>([]);
+  // raw materials force Unit 1 (Magasin 1)?? Wait, the user said "comes only from magasin 1"
+  // "this stock comes only from magasin 1"
+  // Let's set the selected unit to be Magasin 1 by default, or force it.
   const [selectedUnitId, setSelectedUnitId] = useState<string>('HQ');
 
   // Pagination State
@@ -29,12 +32,6 @@ export default function Products() {
   const [adjustData, setAdjustData] = useState({ quantity: 0, type: 'add', note: '' });
 
   useEffect(() => {
-    if (unitId && (role === 'magasinier' || role === 'magasinier_central' || ['admin', 'superadmin'].includes(role || ''))) {
-      setSelectedUnitId(unitId);
-    }
-  }, [unitId, role]);
-
-  useEffect(() => {
     if (!tenantId) return;
 
     const fetchUnits = async () => {
@@ -42,14 +39,21 @@ export default function Products() {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists() && docSnap.data().units) {
         setUnits(docSnap.data().units);
+        // Find Magasin 1 if possible
+        const u = docSnap.data().units;
+        const mag1 = u.find((x: any) => x.name.toLowerCase().includes('magasin 1')) || u[0];
+        if (mag1) {
+            setSelectedUnitId(mag1.id);
+        } else {
+            setSelectedUnitId('HQ'); // fallback
+        }
       }
     };
     fetchUnits();
 
-    const q = query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('name', 'asc'));
+    const q = query(collection(db, 'products'), where('tenantId', '==', tenantId), where('type', '==', 'raw_material'), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-      setProducts(data.filter(p => p.type !== 'raw_material'));
+      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
     return () => unsubscribe();
@@ -57,10 +61,6 @@ export default function Products() {
 
   // Helper Functions for Stock View
   const getStockForUnit = (product: any, uId: string) => {
-    if (uId === 'all') {
-      if (!product.unitStocks) return product.stockQuantity || 0;
-      return Object.values(product.unitStocks).reduce((acc: any, curr: any) => acc + (curr.qty || 0), 0) + (product.stockQuantity || 0); // Adding base stock if any
-    }
     if (product.unitStocks && product.unitStocks[uId] !== undefined) {
       return product.unitStocks[uId].qty;
     }
@@ -70,7 +70,6 @@ export default function Products() {
   };
 
   const getMinStockForUnit = (product: any, uId: string) => {
-    if (uId === 'all') return product.minStock || 0;
     if (product.unitStocks && product.unitStocks[uId] !== undefined) {
       return product.unitStocks[uId].min || product.minStock || 0;
     }
@@ -94,7 +93,7 @@ export default function Products() {
         createdBy: user?.displayName || user?.email || 'Unknown User'
       });
       setIsModalOpen(false);
-      setFormData({ name: '', sku: '', category: '', unit: 'pcs', defaultPrice: 0, stockQuantity: 0, minStock: 0, type: 'product' });
+      setFormData({ name: '', sku: '', category: 'Matière Première', unit: 'kg', defaultPrice: 0, stockQuantity: 0, minStock: 0, type: 'raw_material' });
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Une erreur est survenue.");
@@ -160,8 +159,8 @@ export default function Products() {
       minStock: getMinStockForUnit(p, selectedUnitId)
     })));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Catalogue");
-    XLSX.writeFile(workbook, "Catalogue_Articles.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "MatieresPremieres");
+    XLSX.writeFile(workbook, "Stock_Matieres_Premieres.xlsx");
   };
 
   const importFromExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,9 +181,9 @@ export default function Products() {
           await addDoc(collection(db, 'products'), {
             sku: String(row.sku || row.SKU || row['Référence'] || ''),
             name: String(row.name || row.Désignation || row.Nom || ''),
-            category: String(row.category || row.Catégorie || ''),
-            unit: String(row.unit || row['Unité'] || 'pcs'),
-            type: 'product',
+            category: String(row.category || row.Catégorie || 'Matière Première'),
+            unit: String(row.unit || row['Unité'] || 'kg'),
+            type: 'raw_material',
             defaultPrice: Number(row.defaultPrice || row['Prix Unit.'] || row.Prix || 0),
             stockQuantity: Number(row.stockQuantity || row.Stock || row['En Stock'] || 0),
             minStock: Number(row.minStock || row.Seuil || 0),
@@ -219,8 +218,8 @@ export default function Products() {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#136AA8] tracking-tight">Catalogue Produits</h2>
-          <p className="text-sm text-gray-500 font-medium">Gestion des articles et stock par entité</p>
+          <h2 className="text-2xl font-bold text-amber-700 tracking-tight">Stock Matière Première</h2>
+          <p className="text-sm text-gray-500 font-medium">Gestion du stock magasin 1</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input 
@@ -230,17 +229,17 @@ export default function Products() {
             accept=".xlsx, .xls, .csv" 
             className="hidden" 
           />
-          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-[#136AA8] rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
+          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-amber-700 rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
             <UploadCloud size={16} />
             Importer Excel
           </button>
-          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-[#136AA8] rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
+          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-amber-700 rounded-xl hover:bg-slate-50 font-bold text-xs transition-all uppercase tracking-wide">
             <FileSpreadsheet size={16} />
             Exporter Excel
           </button>
-          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#3B82F6] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#009CDA] shadow-lg shadow-blue-100 transition-all text-xs uppercase tracking-widest">
+          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-amber-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-amber-700 shadow-lg shadow-amber-100 transition-all text-xs uppercase tracking-widest">
             <Plus size={18} />
-            Ajouter Produit
+            Nouvelle Matière
           </button>
         </div>
       </div>
@@ -252,7 +251,7 @@ export default function Products() {
           </div>
           <div>
             <h3 className="text-orange-800 font-black tracking-tight uppercase text-sm mb-1">Alertes de Stock ({alertProducts.length})</h3>
-            <p className="text-orange-700 text-xs font-medium mb-3">Certains articles ont atteint ou dépassé leur seuil d'alerte dans l'unité sélectionnée.</p>
+            <p className="text-orange-700 text-xs font-medium mb-3">Certains articles ont atteint ou dépassé leur seuil d'alerte.</p>
             <div className="flex flex-wrap gap-2">
               {alertProducts.slice(0, 5).map(p => (
                 <span key={p.id} className="px-3 py-1 bg-white/60 text-orange-800 rounded-lg text-[10px] font-bold border border-orange-200/50">
@@ -266,8 +265,8 @@ export default function Products() {
       )}
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex-1 flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl group focus-within:ring-2 focus-within:ring-blue-100 transition-all w-full">
-          <Search size={18} className="text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+        <div className="flex-1 flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl group focus-within:ring-2 focus-within:ring-amber-100 transition-all w-full">
+          <Search size={18} className="text-slate-400 group-focus-within:text-amber-600 transition-colors" />
           <input 
             type="text" 
             placeholder="Rechercher par nom ou SKU..." 
@@ -282,29 +281,18 @@ export default function Products() {
         
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <Filter size={16} className="text-slate-400 ml-1" />
-          <select 
-            value={selectedUnitId} 
-            onChange={(e) => setSelectedUnitId(e.target.value)}
-            disabled={role === 'magasinier'}
-            className="flex-1 sm:w-48 bg-slate-50 border-none px-4 py-2 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer disabled:opacity-50"
-          >
-            {role !== 'magasinier' && <option value="all">Global (Toutes Unités)</option>}
-            <option value="HQ">Siège Principal (HQ)</option>
-            {units.map(u => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
+          <span className="text-sm font-bold text-slate-700">Magasin 1</span>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#009CDA]" /></div>
+        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-amber-600" /></div>
       ) : (
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-[#136AA8] text-white text-[10px] uppercase font-black tracking-[0.2em]">
+                <tr className="bg-amber-700 text-white text-[10px] uppercase font-black tracking-[0.2em]">
                   <th className="px-5 py-5">SKU / Réf</th>
                   <th className="px-5 py-5">Désignation</th>
                   <th className="px-5 py-5">Catégorie</th>
@@ -323,9 +311,9 @@ export default function Products() {
                   return (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-5 py-5 font-mono text-xs font-bold text-slate-400 tracking-tighter uppercase">{p.sku}</td>
-                    <td className="px-5 py-5 font-bold text-[#136AA8] uppercase text-sm">{p.name}</td>
+                    <td className="px-5 py-5 font-bold text-amber-800 uppercase text-sm">{p.name}</td>
                     <td className="px-5 py-5">
-                      <span className="px-3 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest border border-slate-200">
+                      <span className="px-3 py-1 bg-amber-50 rounded-lg text-[9px] font-black text-amber-700 uppercase tracking-widest border border-amber-200">
                         {p.category || 'N/A'}
                       </span>
                     </td>
@@ -340,7 +328,7 @@ export default function Products() {
                     <td className="px-5 py-5 text-center">
                       <span className="text-[11px] font-bold text-slate-400 uppercase">{p.unit}</span>
                     </td>
-                    <td className="px-5 py-5 font-black text-right text-[#136AA8] font-mono whitespace-nowrap text-xs">
+                    <td className="px-5 py-5 font-black text-right text-amber-800 font-mono whitespace-nowrap text-xs">
                       {p.defaultPrice?.toLocaleString()}
                     </td>
                     <td className="px-5 py-5 text-center">
@@ -360,9 +348,8 @@ export default function Products() {
                            setAdjustData({ quantity: 0, type: 'add', note: '' });
                            setIsAdjustModalOpen(true);
                          }}
-                         disabled={selectedUnitId === 'all'}
-                         className="p-2 bg-blue-50 text-[#009CDA] rounded-lg transition-all hover:bg-blue-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                         title={selectedUnitId === 'all' ? "Sélectionnez une unité d'abord" : "Ajuster le Stock"}
+                         className="p-2 bg-amber-50 text-amber-600 rounded-lg transition-all hover:bg-amber-100"
+                         title="Ajuster le Stock"
                        >
                          <ArrowRightLeft size={16} />
                        </button>
@@ -409,10 +396,10 @@ export default function Products() {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdjustModalOpen(false)} className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-sm bg-white rounded-[2rem] overflow-hidden shadow-2xl border border-slate-200">
-              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-amber-700 text-white">
                 <div>
                   <h3 className="text-lg font-black uppercase tracking-tight">Ajustement Stock</h3>
-                  <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest mt-1">{selectedProduct.name}</p>
+                  <p className="text-[10px] text-amber-200 font-bold uppercase tracking-widest mt-1">{selectedProduct.name}</p>
                 </div>
                 <button onClick={() => setIsAdjustModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={18} /></button>
               </div>
@@ -430,7 +417,7 @@ export default function Products() {
                       onClick={() => setAdjustData({ ...adjustData, type: t as any })}
                       className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
                         adjustData.type === t 
-                          ? t === 'set' ? 'bg-[#136AA8] text-white shadow-sm' : t === 'remove' ? 'bg-red-500 text-white shadow-sm' : 'bg-emerald-500 text-white shadow-sm'
+                          ? t === 'set' ? 'bg-amber-600 text-white shadow-sm' : t === 'remove' ? 'bg-red-500 text-white shadow-sm' : 'bg-emerald-500 text-white shadow-sm'
                           : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
                       }`}
                     >
@@ -441,11 +428,11 @@ export default function Products() {
                 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Quantité</label>
-                  <input type="number" required min="0" value={adjustData.quantity} onChange={e => setAdjustData({ ...adjustData, quantity: Number(e.target.value) })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-mono font-black text-center focus:bg-white transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200" />
+                  <input type="number" required min="0" value={adjustData.quantity} onChange={e => setAdjustData({ ...adjustData, quantity: Number(e.target.value) })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-mono font-black text-center focus:bg-white transition-all outline-none focus:ring-4 focus:ring-amber-50 focus:border-amber-200" />
                 </div>
                 
                 <button type="submit" disabled={loadingForm} className={`w-full py-4 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all shadow-xl active:scale-95 mt-2 disabled:bg-slate-400 disabled:shadow-none ${
-                  adjustData.type === 'remove' ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : adjustData.type === 'set' ? 'bg-[#136AA8] hover:bg-slate-900 shadow-slate-200' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200'
+                  adjustData.type === 'remove' ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : adjustData.type === 'set' ? 'bg-amber-600 hover:bg-slate-900 shadow-slate-200' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200'
                 }`}>
                   {loadingForm ? 'Mise à jour en cours...' : 'Valider l\'ajustement'}
                 </button>
@@ -461,10 +448,10 @@ export default function Products() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200">
-              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-[#136AA8] text-white">
+              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-amber-700 text-white">
                 <div>
-                  <h3 className="text-xl font-black uppercase tracking-tight">Nouveau Produit</h3>
-                  <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest mt-1">Nomenclature technique</p>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Nouvelle Matière</h3>
+                  <p className="text-[10px] text-amber-200 font-bold uppercase tracking-widest mt-1">Nomenclature technique</p>
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
               </div>
@@ -477,16 +464,16 @@ export default function Products() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">SKU / Référence</label>
-                    <input required placeholder="REF-000X" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold focus:ring-4 focus:ring-blue-50 focus:bg-white outline-none transition-all" />
+                    <input required placeholder="REF-000X" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold focus:ring-4 focus:ring-amber-50 focus:bg-white outline-none transition-all" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Catégorie</label>
-                    <input required placeholder="ex. Outillage" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-50 focus:bg-white outline-none transition-all" />
+                    <input required placeholder="ex. Poudre" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-amber-50 focus:bg-white outline-none transition-all" />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Désignation de l'article</label>
-                  <input required placeholder="Nom complet de l'article" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" />
+                  <input required placeholder="Nom complet de l'article" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-amber-800 outline-none focus:ring-4 focus:ring-amber-50 focus:bg-white transition-all" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
@@ -495,6 +482,7 @@ export default function Products() {
                       <option value="pcs">Pièce (pcs)</option>
                       <option value="kg">Kilogramme (kg)</option>
                       <option value="ton">Tonne</option>
+                      <option value="liter">Litre (L)</option>
                       <option value="meter">Mètre (m)</option>
                       <option value="m2">Mètre Carré (m2)</option>
                       <option value="m3">Mètre Cube (m3)</option>
@@ -515,8 +503,8 @@ export default function Products() {
                     <input type="number" placeholder="0" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: Number(e.target.value) })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold focus:bg-white transition-all" />
                   </div>
                 </div>
-                <button type="submit" disabled={loadingForm} className="w-full py-5 bg-[#136AA8] text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400">
-                  {loadingForm ? 'Enregistrement en cours...' : 'Inscrire au Catalogue'}
+                <button type="submit" disabled={loadingForm} className="w-full py-5 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-900 transition-all shadow-xl shadow-slate-200/50 active:scale-95 mt-4 disabled:bg-slate-400">
+                  {loadingForm ? 'Enregistrement en cours...' : 'Inscrire au Stock'}
                 </button>
               </form>
             </motion.div>

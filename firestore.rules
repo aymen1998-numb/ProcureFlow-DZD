@@ -12,7 +12,8 @@ service cloud.firestore {
     function getUserData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
     function role() { return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData().get('role', 'user') : 'user'; }
     function getTenantId() { return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData().get('tenantId', request.auth.uid) : request.auth.uid; }
-    function isAdmin() { return isSignedIn() && role() == 'admin'; }
+    function isAdmin() { return isSignedIn() && (role() == 'admin' || role() == 'superadmin'); }
+    function isSuperAdmin() { return isSignedIn() && role() == 'superadmin'; }
     function isBuyer() { return isSignedIn() && role() == 'buyer'; }
     function isFinance() { return isSignedIn() && role() == 'finance'; }
     function incoming() { return request.resource.data; }
@@ -95,6 +96,20 @@ service cloud.firestore {
     }
 
     match /intl_purchases/{purchaseId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /boms/{bomId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /production_orders/{orderId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();
       allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();

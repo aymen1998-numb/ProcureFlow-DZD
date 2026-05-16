@@ -90,10 +90,12 @@ export default function Archive() {
     };
   }, [tenantId]);
 
-  const filteredItems = items.filter(r => 
-    r.daNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.poNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = React.useMemo(() => {
+    return items.filter(r => 
+      r.daNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.poNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [items, searchTerm]);
 
   const downloadArchive = (item: any) => {
     try {

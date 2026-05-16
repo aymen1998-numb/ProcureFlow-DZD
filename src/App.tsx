@@ -10,6 +10,8 @@ import Dashboard from './components/Dashboard';
 import PODetails from './components/PODetails';
 import TransferDetails from './components/TransferDetails';
 import { Loader2 } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastProvider } from './contexts/ToastContext';
 
 export default function App() {
   const { user, loading, role } = useAuth();
@@ -23,28 +25,32 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-        <Routes>
-          <Route 
-            path="/login" 
-            element={user ? <Navigate to="/" /> : <Login />} 
-          />
-          <Route 
-            path="/" 
-            element={user ? <Dashboard /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/purchase/:id" 
-            element={user ? (role === 'magasinier' ? <Navigate to="/" /> : <PODetails />) : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/transfers/:id" 
-            element={user ? <TransferDetails /> : <Navigate to="/login" />} 
-          />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <ToastProvider>
+        <BrowserRouter>
+          <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+            <Routes>
+              <Route 
+                path="/login" 
+                element={user ? <Navigate to="/" /> : <Login />} 
+              />
+              <Route 
+                path="/" 
+                element={user ? <Dashboard /> : <Navigate to="/login" />} 
+              />
+              <Route 
+                path="/purchase/:id" 
+                element={user ? (role === 'magasinier' ? <Navigate to="/" /> : <PODetails />) : <Navigate to="/login" />} 
+              />
+              <Route 
+                path="/transfers/:id" 
+                element={user ? <TransferDetails /> : <Navigate to="/login" />} 
+              />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </div>
+        </BrowserRouter>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }

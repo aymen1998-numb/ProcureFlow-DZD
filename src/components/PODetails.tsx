@@ -13,10 +13,12 @@ import { useAuth } from '../hooks/useAuth';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useToast } from '../contexts/ToastContext';
 
 export default function PODetails() {
   const { id } = useParams();
   const { user, role, tenantId } = useAuth();
+  const { success, error: toastError } = useToast();
   const [po, setPo] = useState<any>(null);
   const [supplier, setSupplier] = useState<any>(null);
   const [deliveries, setDeliveries] = useState<any[]>([]);
@@ -128,7 +130,7 @@ export default function PODetails() {
   const handleDeletePO = async () => {
     if (!id) return;
     if (['sent', 'confirmed', 'delivered', 'closed'].includes(po?.status)) {
-      alert("Action impossible : le bon de commande a déjà été engagé avec le fournisseur.");
+      toastError("Action impossible : le bon de commande a déjà été engagé avec le fournisseur.");
       setIsDeleteDialogOpen(false);
       return;
     }
@@ -155,7 +157,7 @@ export default function PODetails() {
     // Check if everything is already delivered
     const isFullyDelivered = po.items.every((item: any) => (deliveredMap[item.sku] || 0) >= item.quantity);
     if (isFullyDelivered) {
-      alert("Erreur : Tous les articles de ce BC ont déjà été livrés.");
+      toastError("Erreur : Tous les articles de ce BC ont déjà été livrés.");
       return;
     }
 
@@ -688,7 +690,7 @@ export default function PODetails() {
                 </button>
               )}
 
-              {po.status === 'pending_approval' && role === 'admin' && (
+              {po.status === 'pending_approval' && ['admin', 'superadmin'].includes(role || '') && (
                 <>
                   <button onClick={() => updateStatus('approved')} className="py-4 px-6 flex-1 bg-green-500 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg shadow-green-100">
                     <CheckCircle size={18} /> Approuver

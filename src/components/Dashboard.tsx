@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +27,10 @@ import {
   ArrowRightLeft,
   FileText,
   Archive as ArchiveIcon,
-  Coins
+  Coins,
+  ClipboardList,
+  Factory,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -35,11 +38,13 @@ import { useAuth } from '../hooks/useAuth';
 import * as XLSX from 'xlsx';
 import CreatePOModal from './CreatePOModal';
 import AddSupplierModal from './AddSupplierModal';
-import Suppliers from './Suppliers';
-import Products from './Products';
-import UsersComponent from './Users';
-import ActivityLog from './ActivityLog';
-import Analytics from './Analytics';
+import { ErrorBoundary } from './ErrorBoundary';
+
+const Suppliers = lazy(() => import('./Suppliers'));
+const Products = lazy(() => import('./Products'));
+const UsersComponent = lazy(() => import('./Users'));
+const ActivityLog = lazy(() => import('./ActivityLog'));
+const Analytics = lazy(() => import('./Analytics'));
 
 interface PO {
   id: string;
@@ -54,18 +59,22 @@ interface PO {
   unit?: any;
 }
 
-import SettingsComponent from './Settings';
-import Transfers from './Transfers';
-import CashRequests from './CashRequests';
+const SettingsComponent = lazy(() => import('./Settings'));
+const Transfers = lazy(() => import('./Transfers'));
+const CashRequests = lazy(() => import('./CashRequests'));
 
-import InternalRequests from './InternalRequests';
-import IntlPurchases from './IntlPurchases';
-import Archive from './Archive';
+const InternalRequests = lazy(() => import('./InternalRequests'));
+const IntlPurchases = lazy(() => import('./IntlPurchases'));
+const Archive = lazy(() => import('./Archive'));
+const RawMaterials = lazy(() => import('./RawMaterials'));
+const BOMs = lazy(() => import('./BOMs'));
+const ProductionOrders = lazy(() => import('./ProductionOrders'));
+const UserGuide = lazy(() => import('./UserGuide'));
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const { user, role, tenantId, unitId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'intl_purchases' | 'transfers' | 'suppliers' | 'products' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'intl_purchases' | 'transfers' | 'suppliers' | 'products' | 'raw_materials' | 'boms' | 'production_orders' | 'user_guide' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings'>('dashboard');
   
   useEffect(() => {
     if (role === 'magasinier') {
@@ -142,7 +151,7 @@ export default function Dashboard() {
       setPos([]);
       setLoading(false);
       // Wait for unsub check below...
-    } else if (role === 'admin') {
+    } else if (['admin', 'superadmin'].includes(role || '')) {
       getDoc(doc(db, 'tenant_settings', tenantId)).then(snap => {
         if (snap.exists()) {
           const data = snap.data();
@@ -220,7 +229,7 @@ export default function Dashboard() {
   };
 
   const filteredPos = pos.filter(p => {
-    if (role === 'admin' && dashboardUnitId !== 'all') {
+    if (['admin', 'superadmin'].includes(role || '') && dashboardUnitId !== 'all') {
       return p.unit?.id === dashboardUnitId;
     }
     return true;
@@ -230,7 +239,7 @@ export default function Dashboard() {
     { label: 'Commandes Totales', value: filteredPos.length, icon: Package, color: 'blue' },
     { label: 'En attente Livraison', value: filteredPos.filter(p => !['delivered', 'closed'].includes(p.status)).length, icon: Truck, color: 'orange' },
     { label: 'Alertes Stock', value: products.filter(p => {
-      if (role === 'admin' && dashboardUnitId === 'all') {
+      if (['admin', 'superadmin'].includes(role || '') && dashboardUnitId === 'all') {
         let hasAlert = false;
         // Check HQ
         const hqStock = p.stockQuantity || 0;
@@ -247,7 +256,7 @@ export default function Dashboard() {
         }
         return hasAlert;
       } else {
-        const uId = (role === 'admin' && dashboardUnitId !== 'all') ? dashboardUnitId : (unitId || 'HQ');
+        const uId = (['admin', 'superadmin'].includes(role || '') && dashboardUnitId !== 'all') ? dashboardUnitId : (unitId || 'HQ');
         const stock = (p.unitStocks && p.unitStocks[uId] !== undefined) ? p.unitStocks[uId].qty : (uId === 'HQ' ? (p.stockQuantity || 0) : 0);
         const min = (p.unitStocks && p.unitStocks[uId] !== undefined && p.unitStocks[uId].min !== undefined) ? p.unitStocks[uId].min : (p.minStock || 0);
         return stock <= min && stock > 0;
@@ -296,7 +305,7 @@ export default function Dashboard() {
           >
             <FileText size={16} /> {t('da')}
           </button>
-          {['admin', 'buyer_intl'].includes(role || '') && (
+          {['admin', 'superadmin', 'buyer_intl'].includes(role || '') && (
             <button 
               onClick={() => { setActiveTab('intl_purchases'); setIsMobileMenuOpen(false); }}
               className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'intl_purchases' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
@@ -325,6 +334,28 @@ export default function Dashboard() {
             <Box size={16} /> {t('products')}
           </button>
           <button 
+            onClick={() => { setActiveTab('raw_materials'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'raw_materials' ? 'bg-amber-50 text-amber-700 border-l-4 border-amber-600' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+          >
+            <Box size={16} /> Mat. Première
+          </button>
+          {['admin', 'superadmin', 'production', 'magasinier'].includes(role || '') && (
+            <>
+              <button 
+                onClick={() => { setActiveTab('boms'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'boms' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <ClipboardList size={16} /> Nomenclatures (BOM)
+              </button>
+              <button 
+                onClick={() => { setActiveTab('production_orders'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'production_orders' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <Factory size={16} /> Production
+              </button>
+            </>
+          )}
+          <button 
             onClick={() => { setActiveTab('cash'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'cash' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
           >
@@ -352,8 +383,18 @@ export default function Dashboard() {
               </button>
             </>
           )}
+
+          <div className="pt-4 pb-2 px-4">
+             <p className="text-[10px] font-black font-mono text-gray-400 uppercase tracking-[0.2em]">Aide & Support</p>
+          </div>
+          <button 
+            onClick={() => { setActiveTab('user_guide'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'user_guide' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+          >
+            <BookOpen size={16} /> Guide Utilisateur
+          </button>
           
-          {role === 'admin' && (
+          {['admin', 'superadmin'].includes(role || '') && (
             <>
               <div className="pt-4 pb-2 px-4">
                 <p className="text-[10px] font-black font-mono text-gray-400 uppercase tracking-[0.2em]">Administration</p>
@@ -453,15 +494,22 @@ export default function Dashboard() {
         </header>
 
         <div className="p-4 sm:p-8 flex-1 overflow-y-auto w-full">
-          <AnimatePresence mode="wait">
-            {activeTab === 'dashboard' && (
+          <ErrorBoundary>
+            <Suspense fallback={
+              <div className="flex flex-col items-center justify-center p-24 h-full">
+                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mb-4" />
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Chargement...</p>
+              </div>
+            }>
+              <AnimatePresence mode="wait">
+                {activeTab === 'dashboard' && (
               <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-2xl font-bold text-[#136AA8] tracking-tight">Tableau de Bord</h2>
                     <p className="text-sm text-gray-500 font-medium">Surveillance des opérations d'achat locale</p>
                   </div>
-                  {role === 'admin' && (
+                  {['admin', 'superadmin'].includes(role || '') && (
                     <div className="flex items-center gap-2">
                        <span className="text-sm font-bold text-gray-500">Unité:</span>
                        <select 
@@ -590,15 +638,21 @@ export default function Dashboard() {
             {activeTab === 'da' && <motion.div key="da" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><InternalRequests onConvertToPO={handleConvertDAToPO} onConvertToIntlPO={handleConvertDAToIntlPO} /></motion.div>}
             {activeTab === 'intl_purchases' && <motion.div key="intl_purchases" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><IntlPurchases /></motion.div>}
             {activeTab === 'archive' && <motion.div key="archive" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Archive /></motion.div>}
+            {activeTab === 'user_guide' && <motion.div key="user_guide" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><UserGuide /></motion.div>}
             {activeTab === 'cash' && <motion.div key="cash" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><CashRequests /></motion.div>}
             {activeTab === 'transfers' && <motion.div key="transfers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Transfers /></motion.div>}
             {activeTab === 'suppliers' && <motion.div key="suppliers" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Suppliers /></motion.div>}
             {activeTab === 'products' && <motion.div key="products" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Products /></motion.div>}
+            {activeTab === 'raw_materials' && <motion.div key="raw_materials" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><RawMaterials /></motion.div>}
+            {activeTab === 'boms' && <motion.div key="boms" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><BOMs /></motion.div>}
+            {activeTab === 'production_orders' && <motion.div key="production_orders" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><ProductionOrders /></motion.div>}
             {activeTab === 'analytics' && <motion.div key="analytics" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><Analytics /></motion.div>}
             {activeTab === 'history' && <motion.div key="history" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><ActivityLog /></motion.div>}
-            {activeTab === 'users' && role === 'admin' && <motion.div key="users" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><UsersComponent /></motion.div>}
-            {activeTab === 'settings' && role === 'admin' && <motion.div key="settings" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><SettingsComponent /></motion.div>}
-          </AnimatePresence>
+                {activeTab === 'users' && ['admin', 'superadmin'].includes(role || '') && <motion.div key="users" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><UsersComponent /></motion.div>}
+                {activeTab === 'settings' && ['admin', 'superadmin'].includes(role || '') && <motion.div key="settings" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><SettingsComponent /></motion.div>}
+              </AnimatePresence>
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
 

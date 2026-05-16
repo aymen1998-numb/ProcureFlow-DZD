@@ -1,20 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { Plus, Search, FileText, CheckCircle, XCircle, Printer, Clock, Coins } from 'lucide-react';
+import { Plus, Search, FileText, CheckCircle, XCircle, Printer, Clock, Coins, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import jsPDF from 'jspdf';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '../contexts/ToastContext';
 
 export default function CashRequests() {
   const { t } = useTranslation();
   const { user, role, tenantId } = useAuth();
+  const { success, error } = useToast();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ amount: '', reason: '', department: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   useEffect(() => {
     if (!tenantId) return;
@@ -31,7 +40,7 @@ export default function CashRequests() {
         ...doc.data()
       }));
       
-      if (role !== 'admin' && role !== 'finance') {
+      if (!['admin', 'superadmin', 'finance'].includes(role || '')) {
         data = data.filter((req: any) => req.requesterId === user?.uid);
       }
 
@@ -62,9 +71,10 @@ export default function CashRequests() {
       });
       setIsModalOpen(false);
       setFormData({ amount: '', reason: '', department: '' });
-    } catch (error) {
-      console.error('Error creating cash request:', error);
-      alert('Erreur lors de la création de la demande');
+      success('Bon de caisse créé avec succès');
+    } catch (err) {
+      console.error('Error creating cash request:', err);
+      error('Erreur lors de la création de la demande');
     } finally {
       setIsSubmitting(false);
     }
@@ -90,8 +100,10 @@ export default function CashRequests() {
       }
 
       await updateDoc(doc(db, 'cash_requests', id), updateData);
-    } catch (error) {
-      console.error('Error approving request:', error);
+      success(`Demande approuvée par ${approverRole === 'admin' ? 'Admin' : 'Finance'}`);
+    } catch (err) {
+      console.error('Error approving request:', err);
+      error("Erreur lors de l'approbation");
     }
   };
 
@@ -102,8 +114,10 @@ export default function CashRequests() {
         completedAt: serverTimestamp(),
         completedBy: user?.displayName
       });
-    } catch (error) {
-      console.error('Error completing request:', error);
+      success('Bon de caisse traité et clôturé');
+    } catch (err) {
+      console.error('Error completing request:', err);
+      error('Erreur lors du traitement du bon de caisse');
     }
   };
 
@@ -114,8 +128,10 @@ export default function CashRequests() {
         rejectedAt: serverTimestamp(),
         rejectedBy: user?.displayName
       });
-    } catch (error) {
-      console.error('Error rejecting request:', error);
+      success('La demande a été rejetée');
+    } catch (err) {
+      console.error('Error rejecting request:', err);
+      error('Erreur lors du rejet de la demande');
     }
   };
 
@@ -172,10 +188,36 @@ export default function CashRequests() {
     doc.save(`bon_de_caisse_${req.id.slice(0, 6)}.pdf`);
   };
 
-  const filteredRequests = requests.filter(r => 
-    r.reason.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    r.requesterName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const { filteredRequests, paginatedRequests, totalPages } = React.useMemo(() => {
+    const filtered = requests.filter(r => {
+      const matchesSearch = r.reason.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            r.requesterName.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+
+      let matchesDate = true;
+      if (dateFrom || dateTo) {
+        const reqDate = r.createdAt?.toDate ? r.createdAt.toDate() : new Date();
+        const dFrom = dateFrom ? new Date(dateFrom) : new Date(0);
+        dFrom.setHours(0, 0, 0, 0);
+        const dTo = dateTo ? new Date(dateTo) : new Date(2100, 0, 1);
+        dTo.setHours(23, 59, 59, 999);
+        matchesDate = reqDate >= dFrom && reqDate <= dTo;
+      }
+
+      return matchesSearch && matchesStatus && matchesDate;
+    });
+
+    const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+    const safePage = Math.min(currentPage, totalPages);
+    const paginated = filtered.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage);
+
+    return { filteredRequests: filtered, paginatedRequests: paginated, totalPages };
+  }, [requests, searchTerm, statusFilter, dateFrom, dateTo, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateFrom, dateTo]);
 
   return (
     <div className="space-y-6">
@@ -190,7 +232,7 @@ export default function CashRequests() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
@@ -201,9 +243,45 @@ export default function CashRequests() {
               className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:border-[#009CDA] focus:ring-1 focus:ring-[#009CDA] outline-none transition-all"
             />
           </div>
+
+          <div className="flex bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            {['all', 'requested', 'approved', 'completed', 'rejected'].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${
+                  statusFilter === status 
+                    ? 'bg-[#136AA8] text-white' 
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                }`}
+              >
+                {status === 'all' ? 'Tous' : 
+                 status === 'requested' ? 'En Attente' : 
+                 status === 'approved' ? 'Approuvé' : 
+                 status === 'completed' ? 'Traité' : 'Rejeté'}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-2 py-1 bg-transparent border-none text-[10px] font-bold text-slate-600 focus:outline-none uppercase"
+            />
+            <span className="text-slate-300">-</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-2 py-1 bg-transparent border-none text-[10px] font-bold text-slate-600 focus:outline-none uppercase"
+            />
+          </div>
+
           <button 
             onClick={() => setIsModalOpen(true)} 
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#136AA8] text-white px-5 py-2 rounded-xl font-bold hover:bg-[#152945] transition-all shadow-md active:scale-95 text-sm uppercase tracking-wide"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#136AA8] text-white px-5 py-2 rounded-xl font-bold hover:bg-[#152945] transition-all shadow-md active:scale-95 text-sm uppercase tracking-wide whitespace-nowrap"
           >
             <Plus size={18} /> Nouvelle Demande
           </button>
@@ -211,7 +289,7 @@ export default function CashRequests() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredRequests.map(req => (
+        {paginatedRequests.map(req => (
           <div key={req.id} className="bg-white border text-left border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             <div className="flex justify-between items-start mb-4">
                <div>
@@ -252,7 +330,7 @@ export default function CashRequests() {
                  <Printer size={14} /> Imprimer
                </button>
                
-               {req.status !== 'completed' && req.status !== 'rejected' && role === 'admin' && !req.adminApproved && (
+               {req.status !== 'completed' && req.status !== 'rejected' && ['admin', 'superadmin'].includes(role || '') && !req.adminApproved && (
                  <button onClick={() => handleApprove(req.id, req, 'admin')} className="px-3 py-2 text-emerald-600 hover:bg-emerald-50 bg-emerald-50/50 border border-emerald-100 rounded-lg transition-colors flex-1 flex justify-center gap-1.5 font-bold text-[10px] items-center uppercase">
                    <CheckCircle size={14} /> Approuver (Admin)
                  </button>
@@ -269,7 +347,7 @@ export default function CashRequests() {
                  </button>
                )}
 
-               {req.status === 'requested' && (role === 'admin' || role === 'finance') && (
+               {req.status === 'requested' && (['admin', 'superadmin', 'finance'].includes(role || '')) && (
                  <button onClick={() => handleReject(req.id)} className="px-3 py-2 text-red-600 hover:bg-red-50 bg-red-50/50 border border-red-100 rounded-lg transition-colors flex-none flex justify-center items-center">
                    <XCircle size={16} />
                  </button>
@@ -283,6 +361,33 @@ export default function CashRequests() {
           </div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <span className="text-xs font-bold text-slate-500">
+            Affichage {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredRequests.length)} sur {filteredRequests.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-black text-slate-700">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">

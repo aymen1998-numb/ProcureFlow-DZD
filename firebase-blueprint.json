@@ -8,7 +8,7 @@
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "buyer", "finance"] },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "buyer", "finance", "buyer_intl", "magasinier", "magasinier_central"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role"]

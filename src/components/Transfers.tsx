@@ -41,17 +41,19 @@ export default function Transfers() {
 
   const currentUnitName = unitId === 'HQ' ? 'Siège Principal' : (units.find(u => u.id === unitId)?.name || unitId);
 
-  const filteredTransfers = transfers.filter(t => {
-    const matchesSearch = t.transferNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.sourceLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.destLocation?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (role === 'magasinier' && unitId) {
-      const matchesUnit = t.sourceLocation === currentUnitName || t.destLocation === currentUnitName;
-      return matchesSearch && matchesUnit;
-    }
-    return matchesSearch;
-  });
+  const filteredTransfers = React.useMemo(() => {
+    return transfers.filter(t => {
+      const matchesSearch = t.transferNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            t.sourceLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            t.destLocation?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (role === 'magasinier' && unitId) {
+        const matchesUnit = t.sourceLocation === currentUnitName || t.destLocation === currentUnitName;
+        return matchesSearch && matchesUnit;
+      }
+      return matchesSearch;
+    });
+  }, [transfers, searchTerm, role, unitId, currentUnitName]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

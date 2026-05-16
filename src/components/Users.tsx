@@ -175,7 +175,7 @@ export default function Users() {
         {users.map(user => (
           <motion.div key={user.id} layout className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col gap-4 relative group">
             <div className="flex items-start gap-4">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg text-white ${user.role === 'admin' ? 'bg-indigo-500' : user.role === 'finance' ? 'bg-emerald-500' : 'bg-blue-500'}`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg text-white ${['admin', 'superadmin'].includes(user.role) ? 'bg-indigo-500' : user.role === 'finance' ? 'bg-emerald-500' : 'bg-blue-500'}`}>
                 {user.displayName?.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1">
@@ -186,8 +186,9 @@ export default function Users() {
                   <select
                     value={user.role || 'buyer'}
                     onChange={(e) => handleUpdateRole(user.id, e.target.value)}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest outline-none border cursor-pointer hover:shadow-sm transition-all ${user.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : user.role === 'finance' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : user.role === 'magasinier' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-blue-50 text-blue-700 border-blue-100'}`}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest outline-none border cursor-pointer hover:shadow-sm transition-all ${['admin', 'superadmin'].includes(user.role) ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : user.role === 'finance' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : user.role === 'magasinier' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-blue-50 text-blue-700 border-blue-100'}`}
                   >
+                    <option value="superadmin">Super Administrateur</option>
                     <option value="admin">Administrateur</option>
                     <option value="finance">Finance</option>
                     <option value="buyer">Acheteur Local</option>
@@ -237,6 +238,7 @@ export default function Users() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Rôle</label>
                     <select required value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:bg-white transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200">
+                      <option value="superadmin">Super Administrateur</option>
                       <option value="admin">Administrateur</option>
                       <option value="finance">Finance</option>
                       <option value="buyer">Acheteur Local</option>

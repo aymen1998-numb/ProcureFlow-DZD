@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
-import { FileText, Plus, Search, Trash2, Link as LinkIcon, Loader2, X } from 'lucide-react';
+import { FileText, Plus, Search, Trash2, Link as LinkIcon, Loader2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useToast } from '../contexts/ToastContext';
 
 export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: { onConvertToPO?: (da: any) => void, onConvertToIntlPO?: (da: any) => void }) {
   const { tenantId, role, unitId, user } = useAuth();
+  const { success, error } = useToast();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,6 +20,9 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [items, setItems] = useState<any[]>([{ name: '', qtyInStock: 0, monthlyConsumption: 0, quantity: 1, category: '', unit: 'pcs' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   useEffect(() => {
     if (!tenantId) return;
@@ -59,8 +64,8 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
       
       setRequests(data);
       setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'purchase_requests');
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'purchase_requests');
     });
 
     return () => {
@@ -98,9 +103,10 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
       });
       setIsModalOpen(false);
       setItems([{ name: '', qtyInStock: 0, monthlyConsumption: 0, quantity: 1, category: '', unit: 'pcs' }]);
+      success('Demande d\'achat créée avec succès');
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de la création de la DA.");
+      error("Erreur lors de la création de la DA.");
     } finally {
       setIsSubmitting(false);
     }
@@ -114,25 +120,40 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
           cancelledAt: new Date().toISOString(),
           cancelledBy: user?.displayName
         });
+        success('DA annulée avec succès');
       } catch (err) {
         console.error("Error cancelling DA", err);
+        error("Erreur lors de l'annulation de la DA");
       }
     }
   };
 
-  const filteredRequests = requests.filter(r => {
-    const matchesSearch = r.daNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.items?.some((i: any) => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    let matchesStatus = true;
-    if (statusFilter === 'active') {
-      matchesStatus = ['confirmed', 'partial', 'pending'].includes(r.status);
-    } else if (statusFilter !== 'all') {
-      matchesStatus = r.status === statusFilter;
-    }
-    
-    return matchesSearch && matchesStatus;
-  });
+  const { filteredRequests, paginatedRequests, totalPages } = React.useMemo(() => {
+    const filtered = requests.filter(r => {
+      const matchesSearch = r.daNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.items?.some((i: any) => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      let matchesStatus = true;
+      if (statusFilter === 'active') {
+        matchesStatus = ['confirmed', 'partial', 'pending'].includes(r.status);
+      } else if (statusFilter !== 'all') {
+        matchesStatus = r.status === statusFilter;
+      }
+      
+      return matchesSearch && matchesStatus;
+    });
+
+    const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+    const safePage = Math.min(currentPage, totalPages);
+    const paginated = filtered.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage);
+
+    return { filteredRequests: filtered, paginatedRequests: paginated, totalPages };
+  }, [requests, searchTerm, statusFilter, currentPage, itemsPerPage]);
+
+  // reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const getUnitName = (uId: string) => {
     if (uId === 'HQ') return 'Siège Principal';
@@ -175,7 +196,7 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
             <option value="completed">Clôturées</option>
             <option value="cancelled">Annulées</option>
           </select>
-          {(role === 'magasinier' || role === 'magasinier_central' || role === 'admin') && (
+          {(role === 'magasinier' || role === 'magasinier_central' || ['admin', 'superadmin'].includes(role || '')) && (
             <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#136AA8] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#152945] transition-all shadow-md active:scale-95 text-sm uppercase tracking-wide">
               <Plus size={18} /> Nouvelle DA
             </button>
@@ -195,7 +216,7 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredRequests.map(req => (
+          {paginatedRequests.map(req => (
             <motion.div key={req.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
               <div className="p-5 border-b border-slate-100 flex justify-between items-start">
                 <div>
@@ -219,7 +240,7 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
                   <p className="text-xs text-slate-500 font-medium">Unité: <span className="text-slate-800 font-bold">{getUnitName(req.unitId)}</span></p>
                   <p className="text-[10px] text-slate-400 mt-1">Par {req.createdBy} le {new Date(req.createdAt).toLocaleDateString('fr-FR')}</p>
                 </div>
-                {(role === 'magasinier' || role === 'magasinier_central' || role === 'admin') && (
+                {(role === 'magasinier' || role === 'magasinier_central' || ['admin', 'superadmin'].includes(role || '')) && (
                   <button onClick={() => handleCancelDA(req.id)} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors" title="Annuler/Supprimer">
                     <Trash2 size={18} />
                   </button>
@@ -244,14 +265,14 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
               </div>
               
               {/* Buyer Actions */}
-              {['buyer', 'buyer_intl', 'admin'].includes(role || '') && (
+              {['buyer', 'buyer_intl', 'admin', 'superadmin'].includes(role || '') && (
                 <div className="bg-slate-50 p-4 border-t border-slate-100 mt-auto flex flex-col gap-2">
-                  {['buyer', 'admin'].includes(role || '') && (
+                  {['buyer', 'admin', 'superadmin'].includes(role || '') && (
                     <button onClick={() => onConvertToPO && onConvertToPO(req)} className="w-full flex items-center justify-center gap-2 bg-white border-2 border-[#136AA8] text-[#136AA8] py-2.5 rounded-xl font-bold hover:bg-[#136AA8] hover:text-white transition-all text-xs uppercase tracking-widest">
                       <LinkIcon size={16} /> Bon de Cmd Local
                     </button>
                   )}
-                  {['buyer_intl', 'admin'].includes(role || '') && (
+                  {['buyer_intl', 'admin', 'superadmin'].includes(role || '') && (
                     <button onClick={() => onConvertToIntlPO && onConvertToIntlPO(req)} className="w-full flex items-center justify-center gap-2 bg-[#136AA8] text-white py-2.5 rounded-xl font-bold hover:bg-blue-800 transition-all text-xs uppercase tracking-widest shadow-md">
                       <LinkIcon size={16} /> Achat International
                     </button>
@@ -260,6 +281,33 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
               )}
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl shadow-sm mt-6">
+          <span className="text-xs font-bold text-slate-500">
+            Affichage {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredRequests.length)} sur {filteredRequests.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-black text-slate-700">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -277,7 +325,7 @@ export default function InternalRequests({ onConvertToPO, onConvertToIntlPO }: {
                   <div className="p-4 sm:p-8 overflow-y-auto flex-1 space-y-6">
                     
                     <div className="space-y-4">
-                      {(role === 'admin' || role === 'magasinier_central') && (
+                      {(['admin', 'superadmin'].includes(role || '') || role === 'magasinier_central') && (
                         <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pour l'unité :</label>
                           <select 
