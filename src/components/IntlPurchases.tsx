@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
-import { Globe, Plus, Search, Trash2, CheckSquare, Square, FileText, ChevronRight, X, Ship, CreditCard, Box, FileCheck, Loader2 } from 'lucide-react';
+import { Globe, Plus, Search, Trash2, CheckSquare, Square, FileText, ChevronRight, X, Ship, CreditCard, Box, FileCheck, Loader2, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AddSupplierModal from './AddSupplierModal';
 
@@ -470,6 +470,72 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                 </select>
               </div>
             </div>
+
+            {purchase.incoterm === 'CPT' && (
+              <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-bold text-orange-800 text-sm flex items-center gap-2">
+                      <AlertTriangle size={16} /> Suivi CPT (Préavis 8 jours)
+                    </h4>
+                    <p className="text-xs text-orange-600 mt-1 leading-relaxed">
+                      Le non-respect du délai de 8 jours pour la déclaration en douane depuis l'arrivée entraîne une pénalité de <strong>50 000 DA</strong> (Mainlevée).
+                    </p>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-orange-600 mb-1 block">Date d'Introduction / Arrivée</label>
+                  <input 
+                    type="date"
+                    value={purchase.arrivalDate || ''}
+                    onChange={e => onUpdate({ arrivalDate: e.target.value })}
+                    disabled={isReadOnly}
+                    className="w-full bg-white border border-orange-300 px-3 py-2 rounded-lg text-sm focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed text-slate-700 font-medium shadow-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                  />
+                </div>
+
+                {purchase.arrivalDate && (
+                  <div className="space-y-2 pt-2 border-t border-orange-200/50">
+                    {(() => {
+                        const arrival = new Date(purchase.arrivalDate);
+                        const today = new Date();
+                        // Midnight approach
+                        arrival.setHours(0,0,0,0);
+                        today.setHours(0,0,0,0);
+                        const diffTime = today.getTime() - arrival.getTime();
+                        // If arrival is in the future, days is 0. Else calc days elapsed.
+                        const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+                        const pct = Math.min(100, (diffDays / 8) * 100);
+                        const isPenalty = diffDays > 8;
+                        return (
+                          <>
+                            <div className="flex justify-between items-end">
+                              <span className="text-[10px] font-bold text-orange-800 uppercase tracking-wider">Jours écoulés :</span>
+                              <span className={`text-base font-black ${isPenalty ? 'text-red-600' : 'text-orange-800'}`}>
+                                {diffDays} / 8 jours
+                              </span>
+                            </div>
+                            
+                            <div className="w-full h-3 bg-orange-200/50 rounded-full overflow-hidden shadow-inner">
+                              <div 
+                                className={`h-full ${isPenalty ? 'bg-red-500' : diffDays >= 6 ? 'bg-orange-500' : 'bg-emerald-500'} transition-all duration-500`} 
+                                style={{ width: `${pct}%` }} 
+                              />
+                            </div>
+                            
+                            {isPenalty && (
+                              <div className="bg-red-100/80 text-red-700 p-2.5 rounded-lg text-xs font-bold flex items-center justify-center border border-red-200 mt-2 shadow-sm animate-pulse">
+                                <AlertTriangle size={14} className="mr-2" /> Pénalité applicable (50 000 DA)
+                              </div>
+                            )}
+                          </>
+                        );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="space-y-4">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-inner space-y-4">
