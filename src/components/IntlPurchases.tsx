@@ -133,7 +133,9 @@ export default function IntlPurchases() {
   const filteredPurchases = React.useMemo(() => {
     return purchases.filter(p => 
       (p.daNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (p.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.proformaRef || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [purchases, searchTerm]);
 
@@ -204,7 +206,7 @@ export default function IntlPurchases() {
                     </td>
                     <td className="px-5 py-4 font-bold text-slate-900">{p.supplierName || '-'}</td>
                     <td className="px-5 py-4">
-                      <div className="text-xs font-bold text-slate-700">{p.incoterm || '-'} / {p.transportMethod || '-'}</div>
+                      <div className="text-xs font-bold text-slate-700">{p.incoterm || '-'}</div>
                       <div className="text-[10px] text-slate-500 font-mono mt-0.5">{p.proformaRef ? `Prof: ${p.proformaRef}` : ''}</div>
                     </td>
                     <td className="px-5 py-4">
@@ -388,16 +390,52 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                 <option value="ADD_NEW">+ Ajouter un fournisseur...</option>
               </select>
             </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Référence Proforma</label>
-              <input 
-                value={purchase.proformaRef || ''} 
-                onChange={e => onUpdate({ proformaRef: e.target.value })}
-                disabled={isReadOnly}
-                placeholder="Ex: PROF-2026-001..."
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Référence Proforma</label>
+                <input 
+                  value={purchase.proformaRef || ''} 
+                  onChange={e => onUpdate({ proformaRef: e.target.value })}
+                  disabled={isReadOnly}
+                  placeholder="Ex: PROF-2026-001..."
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Date de Proforma</label>
+                <input 
+                  type="date"
+                  value={purchase.proformaDate || ''} 
+                  onChange={e => onUpdate({ proformaDate: e.target.value })}
+                  disabled={isReadOnly}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed text-slate-700"
+                />
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Numéro de Facture Finale</label>
+                <input 
+                  value={purchase.invoiceNumber || ''} 
+                  onChange={e => onUpdate({ invoiceNumber: e.target.value })}
+                  disabled={isReadOnly}
+                  placeholder="Ex: FACT-2026-001..."
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Date Facture Finale</label>
+                <input 
+                  type="date"
+                  value={purchase.finalInvoiceDate || ''} 
+                  onChange={e => onUpdate({ finalInvoiceDate: e.target.value })}
+                  disabled={isReadOnly}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed text-slate-700"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Incoterm</label>
@@ -418,58 +456,174 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                 </select>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Mode de Transport</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Méthode de Paiement</label>
                 <select 
-                  value={purchase.transportMethod || ''} 
-                  onChange={e => onUpdate({ transportMethod: e.target.value })}
+                  value={purchase.paymentMethod || ''} 
+                  onChange={e => onUpdate({ paymentMethod: e.target.value })}
                   disabled={isReadOnly}
                   className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   <option value="">Sélectionner...</option>
-                  <option value="maritime">Maritime</option>
-                  <option value="aerien">Aérien</option>
-                  <option value="routier">Routier</option>
+                  <option value="LC">Lettre de Crédit (LC)</option>
+                  <option value="DP">Remise Documentaire (DP)</option>
+                  <option value="Free Transfer">Free Transfer (Virement Libre)</option>
                 </select>
               </div>
             </div>
           </div>
           <div className="space-y-4">
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Méthode de Paiement</label>
-              <select 
-                value={purchase.paymentMethod || ''} 
-                onChange={e => onUpdate({ paymentMethod: e.target.value })}
-                disabled={isReadOnly}
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
-              >
-                <option value="">Sélectionner...</option>
-                <option value="LC">Lettre de Crédit (LC)</option>
-                <option value="DP">Remise Documentaire (DP)</option>
-                <option value="Free Transfer">Free Transfer (Virement Libre)</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Montant Total Devise</label>
-              <div className="flex gap-2">
-                <input 
-                  type="number"
-                  value={purchase.totalAmount || ''} 
-                  onChange={e => onUpdate({ totalAmount: e.target.value ? Number(e.target.value) : null })}
-                  disabled={isReadOnly}
-                  placeholder="0.00"
-                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
-                />
-                <select 
-                  value={purchase.currency || 'EUR'}
-                  onChange={e => onUpdate({ currency: e.target.value })}
-                  disabled={isReadOnly}
-                  className="bg-slate-50 border border-slate-200 px-2 rounded-lg text-sm font-bold w-24 disabled:opacity-75 disabled:cursor-not-allowed"
-                >
-                  <option value="EUR">EUR</option>
-                  <option value="USD">USD</option>
-                  <option value="CNY">CNY</option>
-                </select>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-inner space-y-4">
+              <h4 className="font-bold text-xs uppercase text-slate-500 mb-2">Finance & Articles</h4>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                 <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Devise</label>
+                    <select 
+                      value={purchase.currency || 'EUR'}
+                      onChange={e => onUpdate({ currency: e.target.value })}
+                      disabled={isReadOnly}
+                      className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold disabled:opacity-75"
+                    >
+                      <option value="EUR">EUR</option>
+                      <option value="USD">USD</option>
+                      <option value="CNY">CNY</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Coût du Fret / Transport</label>
+                    <input 
+                      type="number"
+                      value={purchase.freightAmount || ''} 
+                      onChange={e => onUpdate({ freightAmount: e.target.value ? Number(e.target.value) : null })}
+                      disabled={isReadOnly}
+                      placeholder="0.00"
+                      className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono disabled:opacity-75 text-amber-600 font-bold"
+                    />
+                 </div>
               </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Liste des Articles</label>
+                  {!isReadOnly && (
+                    <button 
+                      onClick={() => {
+                        const currentItems = purchase.items || [];
+                        onUpdate({ items: [...currentItems, { id: Date.now().toString(), name: '', quantity: 1, unitPrice: 0 }] });
+                      }}
+                      className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded font-bold uppercase transition flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Ajouter Article
+                    </button>
+                  )}
+                </div>
+                
+                {(!purchase.items || purchase.items.length === 0) ? (
+                   <div className="text-center p-4 bg-white border border-slate-200 border-dashed rounded-lg text-xs text-slate-400">
+                     Aucun article ajouté.
+                   </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(purchase.items || []).map((item: any, idx: number) => {
+                      const calculatedTotalFOB = (purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0);
+                      const freight = Number(purchase.freightAmount) || 0;
+                      // Unit CFR = Unit FOB * (1 + Total Freight / Total FOB)
+                      const unitCfr = calculatedTotalFOB > 0 
+                        ? Number(item.unitPrice) * (1 + (freight / calculatedTotalFOB)) 
+                        : Number(item.unitPrice);
+                        
+                      return (
+                        <div key={item.id || idx} className="bg-white p-3 rounded-lg border border-slate-200 relative">
+                          {!isReadOnly && (
+                            <button 
+                              onClick={() => {
+                                const newItems = purchase.items.filter((_: any, i: number) => i !== idx);
+                                onUpdate({ items: newItems });
+                              }}
+                              className="absolute top-2 right-2 text-red-400 hover:text-red-600"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                          <div className="grid grid-cols-12 gap-3 mb-2">
+                            <div className="col-span-12 sm:col-span-6">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Nom de l'article</label>
+                              <input 
+                                type="text"
+                                value={item.name || ''} 
+                                onChange={e => {
+                                  const newItems = [...purchase.items];
+                                  newItems[idx].name = e.target.value;
+                                  onUpdate({ items: newItems });
+                                }}
+                                disabled={isReadOnly}
+                                className="w-full bg-slate-50 border border-slate-200 px-2 py-1.5 rounded text-xs font-bold disabled:opacity-75 focus:bg-white"
+                                placeholder="Description..."
+                              />
+                            </div>
+                            <div className="col-span-6 sm:col-span-3">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Qté</label>
+                              <input 
+                                type="number"
+                                value={item.quantity || ''} 
+                                onChange={e => {
+                                  const newItems = [...purchase.items];
+                                  newItems[idx].quantity = Number(e.target.value);
+                                  onUpdate({ items: newItems });
+                                }}
+                                disabled={isReadOnly}
+                                className="w-full bg-slate-50 border border-slate-200 px-2 py-1.5 rounded text-xs font-mono disabled:opacity-75 focus:bg-white"
+                              />
+                            </div>
+                            <div className="col-span-6 sm:col-span-3">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">P.U FOB</label>
+                              <input 
+                                type="number"
+                                value={item.unitPrice || ''} 
+                                onChange={e => {
+                                  const newItems = [...purchase.items];
+                                  newItems[idx].unitPrice = Number(e.target.value);
+                                  onUpdate({ items: newItems });
+                                }}
+                                disabled={isReadOnly}
+                                className="w-full bg-slate-50 border border-slate-200 px-2 py-1.5 rounded text-xs font-mono disabled:opacity-75 focus:bg-white"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center pt-2 border-t border-slate-100 px-1">
+                             <span className="text-[10px] uppercase font-bold text-slate-400">Prix unitaire CFR:</span>
+                             <span className="text-xs font-black text-[#136AA8]">{unitCfr.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {purchase.currency || 'EUR'}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {purchase.items && purchase.items.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-200 space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                     <span className="text-slate-500 font-bold">Total FOB</span>
+                     <span className="font-bold text-slate-700">
+                       {(purchase.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}
+                     </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                     <span className="text-slate-500 font-bold">Fret Total</span>
+                     <span className="font-bold text-amber-600">
+                       {(Number(purchase.freightAmount) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}
+                     </span>
+                  </div>
+                  <div className="flex justify-between items-center text-base pt-2">
+                     <span className="text-slate-800 font-black">Total CFR</span>
+                     <span className="font-black text-[#136AA8]">
+                       {(purchase.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(purchase.freightAmount) || 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}
+                     </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
