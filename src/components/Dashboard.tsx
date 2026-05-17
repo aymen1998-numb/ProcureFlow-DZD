@@ -30,7 +30,8 @@ import {
   Coins,
   ClipboardList,
   Factory,
-  BookOpen
+  BookOpen,
+  Ship
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -64,6 +65,7 @@ const Transfers = lazy(() => import('./Transfers'));
 const CashRequests = lazy(() => import('./CashRequests'));
 
 const InternalRequests = lazy(() => import('./InternalRequests'));
+const Exports = lazy(() => import('./Exports'));
 const IntlPurchases = lazy(() => import('./IntlPurchases'));
 const Archive = lazy(() => import('./Archive'));
 const RawMaterials = lazy(() => import('./RawMaterials'));
@@ -74,11 +76,13 @@ const UserGuide = lazy(() => import('./UserGuide'));
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const { user, role, tenantId, unitId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'intl_purchases' | 'transfers' | 'suppliers' | 'products' | 'raw_materials' | 'boms' | 'production_orders' | 'user_guide' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'intl_purchases' | 'transfers' | 'suppliers' | 'products' | 'raw_materials' | 'boms' | 'production_orders' | 'user_guide' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings' | 'exports'>('dashboard');
   
   useEffect(() => {
     if (role === 'magasinier') {
       setActiveTab('products');
+    } else if (role === 'export') {
+      setActiveTab('exports');
     }
   }, [role]);
   const [pos, setPos] = useState<PO[]>([]);
@@ -394,6 +398,20 @@ export default function Dashboard() {
             <BookOpen size={16} /> Guide Utilisateur
           </button>
           
+          {['admin', 'superadmin', 'export'].includes(role || '') && (
+            <>
+              <div className="pt-4 pb-2 px-4">
+                <p className="text-[10px] font-black font-mono text-gray-400 uppercase tracking-[0.2em]">Ventes / Exports</p>
+              </div>
+              <button 
+                onClick={() => { setActiveTab('exports'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'exports' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <Ship size={16} /> Exports (Proforma)
+              </button>
+            </>
+          )}
+
           {['admin', 'superadmin'].includes(role || '') && (
             <>
               <div className="pt-4 pb-2 px-4">
@@ -650,6 +668,7 @@ export default function Dashboard() {
             {activeTab === 'history' && <motion.div key="history" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><ActivityLog /></motion.div>}
                 {activeTab === 'users' && ['admin', 'superadmin'].includes(role || '') && <motion.div key="users" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><UsersComponent /></motion.div>}
                 {activeTab === 'settings' && ['admin', 'superadmin'].includes(role || '') && <motion.div key="settings" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><SettingsComponent /></motion.div>}
+                {activeTab === 'exports' && ['admin', 'superadmin', 'export'].includes(role || '') && <motion.div key="exports" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Exports /></motion.div>}
               </AnimatePresence>
             </Suspense>
           </ErrorBoundary>

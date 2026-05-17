@@ -14,7 +14,7 @@ export default function Suppliers() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ name: '', contact: '', family: '', subFamily: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
+  const [formData, setFormData] = useState({ name: '', type: 'local', contact: '', family: '', subFamily: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -29,9 +29,10 @@ export default function Suppliers() {
 
   const seedFakeSuppliers = async () => {
     const fakes = [
-      { name: "SARL METAL LOGISTICS", address: "Z.I. Rouiba, Alger", nif: "000116090012345", rc: "16/00-0123456B15", phone: "+213 21 85 44 22", email: "contact@metalog.dz", tenantId: tenantId, createdAt: new Date().toISOString() },
-      { name: "SPA ALGERIE DISTRIBUTION", address: "Dar El Beida, Alger", nif: "000316010054321", rc: "16/00-0654321B20", phone: "+213 23 45 67 89", email: "sales@alger-dist.dz", tenantId: tenantId, createdAt: new Date().toISOString() },
-      { name: "EURL TECH SOLUTIONS", address: "Hamma, Alger", nif: "000516070098765", rc: "16/00-0987654B10", phone: "+213 21 66 11 00", email: "info@tech-sol.com", tenantId: tenantId, createdAt: new Date().toISOString() }
+      { name: "SARL METAL LOGISTICS", type: "local", address: "Z.I. Rouiba, Alger", nif: "000116090012345", rc: "16/00-0123456B15", phone: "+213 21 85 44 22", email: "contact@metalog.dz", tenantId: tenantId, createdAt: new Date().toISOString() },
+      { name: "SPA ALGERIE DISTRIBUTION", type: "local", address: "Dar El Beida, Alger", nif: "000316010054321", rc: "16/00-0654321B20", phone: "+213 23 45 67 89", email: "sales@alger-dist.dz", tenantId: tenantId, createdAt: new Date().toISOString() },
+      { name: "EURL TECH SOLUTIONS", type: "local", address: "Hamma, Alger", nif: "000516070098765", rc: "16/00-0987654B10", phone: "+213 21 66 11 00", email: "info@tech-sol.com", tenantId: tenantId, createdAt: new Date().toISOString() },
+      { name: "GLOBAL COMPONENTS INC", type: "foreign", address: "123 Tech Lane, Shenzhen, China", nif: "", rc: "", phone: "+86 755 1234 5678", email: "sales@globalcomp.cn", tenantId: tenantId, createdAt: new Date().toISOString() }
     ];
     for (const s of fakes) {
       await addDoc(collection(db, 'suppliers'), s);
@@ -41,7 +42,7 @@ export default function Suppliers() {
   const openCreateModal = () => {
     setIsEditMode(false);
     setEditingSupplierId(null);
-    setFormData({ name: '', contact: '', family: '', subFamily: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
+    setFormData({ name: '', type: role === 'buyer_intl' ? 'foreign' : 'local', contact: '', family: '', subFamily: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
     setIsModalOpen(true);
   };
 
@@ -51,6 +52,7 @@ export default function Suppliers() {
     setEditingSupplierId(supplier.id);
     setFormData({
       name: supplier.name || '',
+      type: supplier.type || 'local',
       contact: supplier.contact || '',
       family: supplier.family || '',
       subFamily: supplier.subFamily || '',
@@ -88,7 +90,7 @@ export default function Suppliers() {
         });
       }
       setIsModalOpen(false);
-      setFormData({ name: '', contact: '', family: '', subFamily: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
+      setFormData({ name: '', type: 'local', contact: '', family: '', subFamily: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Une erreur est survenue.");
@@ -197,9 +199,15 @@ export default function Suppliers() {
     }
   };
 
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const filtered = React.useMemo(() => {
-    return suppliers.filter(s => (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [suppliers, searchTerm]);
+    let result = suppliers;
+    if (statusFilter !== 'all') {
+      result = result.filter(s => s.type === statusFilter);
+    }
+    return result.filter(s => (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [suppliers, searchTerm, statusFilter]);
 
   return (
     <div className="space-y-8">
@@ -238,44 +246,62 @@ export default function Suppliers() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4 bg-white px-5 py-3 rounded-2xl border border-slate-200 max-w-md shadow-sm group focus-within:ring-4 focus-within:ring-blue-50 focus-within:border-blue-200 transition-all flex-1">
-          <Search size={18} className="text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-          <input 
-            type="text" 
-            placeholder="Rechercher par nom..." 
-            className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none font-medium placeholder-slate-300"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 bg-white px-5 py-3 rounded-2xl border border-slate-200 max-w-md shadow-sm group focus-within:ring-4 focus-within:ring-blue-50 focus-within:border-blue-200 transition-all flex-1">
+            <Search size={18} className="text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Rechercher par nom..." 
+              className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none font-medium placeholder-slate-300"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
+             {[
+               { id: 'all', label: 'Tous' },
+               { id: 'local', label: 'Locaux' },
+               { id: 'foreign', label: 'Étrangers' }
+             ].map(f => (
+               <button
+                 key={f.id}
+                 onClick={() => setStatusFilter(f.id)}
+                 className={`px-5 py-2.5 rounded-xl font-bold text-[11px] uppercase tracking-wider whitespace-nowrap transition-all ${statusFilter === f.id ? 'bg-[#136AA8] text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+               >
+                 {f.label}
+               </button>
+             ))}
+          </div>
 
-        {['admin', 'superadmin'].includes(role || '') && (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (selectedSuppliers.length === filtered.length && filtered.length > 0) {
-                  setSelectedSuppliers([]);
-                } else {
-                  setSelectedSuppliers(filtered.map(s => s.id));
-                }
-              }}
-              className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors"
-            >
-              {selectedSuppliers.length === filtered.length && filtered.length > 0 ? 'Tout désélectionner' : 'Tout sélectionner'}
-            </button>
-            {selectedSuppliers.length > 0 && (
-              <button 
-                onClick={handleBulkDelete}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 font-bold text-xs transition-all uppercase tracking-wide border border-red-100"
-              >
-                <Trash2 size={16} />
-                Supprimer ({selectedSuppliers.length})
-              </button>
+          <div className="flex items-center gap-4 w-full sm:w-auto justify-end">
+            {['admin', 'superadmin'].includes(role || '') && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (selectedSuppliers.length === filtered.length && filtered.length > 0) {
+                      setSelectedSuppliers([]);
+                    } else {
+                      setSelectedSuppliers(filtered.map(s => s.id));
+                    }
+                  }}
+                  className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors"
+                >
+                  {selectedSuppliers.length === filtered.length && filtered.length > 0 ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </button>
+                {selectedSuppliers.length > 0 && (
+                  <button 
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 font-bold text-xs transition-all uppercase tracking-wide border border-red-100"
+                  >
+                    <Trash2 size={16} />
+                    Supprimer ({selectedSuppliers.length})
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#009CDA]" /></div>
@@ -300,7 +326,7 @@ export default function Suppliers() {
                 <div className="w-14 h-14 bg-slate-50 text-[#136AA8] rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-[#136AA8] group-hover:text-white transition-all duration-500"><Building2 size={24} /></div>
                 <div className="min-w-0 pr-10">
                   <h3 className="text-lg font-black text-[#136AA8] leading-tight truncate uppercase">{s.name || <span className="text-red-400 italic">SANS NOM</span>}</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Fournisseur Local</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Fournisseur {s.type === 'foreign' ? 'Étranger' : 'Local'}</p>
                 </div>
               </div>
               
@@ -384,6 +410,17 @@ export default function Suppliers() {
                     {error}
                   </div>
                 )}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Type de Fournisseur</label>
+                  <select 
+                    value={formData.type} 
+                    onChange={e => setFormData({ ...formData, type: e.target.value })} 
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all"
+                  >
+                    <option value="local">Local</option>
+                    <option value="foreign">Étranger</option>
+                  </select>
+                </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nom de l'établissement</label>
                   <input required placeholder="ex. SARL ALGER LOG" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" />

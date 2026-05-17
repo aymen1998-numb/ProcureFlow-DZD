@@ -445,7 +445,7 @@ export default function ProductionOrders() {
               </div>
               
               <form onSubmit={handleCreate} className="p-8 space-y-6">
-                {error && <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-200">{error}</div>}
+                {formError && <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-200">{formError}</div>}
                 
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Nomenclature (BOM) <span className="text-red-500">*</span></label>

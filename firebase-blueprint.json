@@ -18,7 +18,9 @@
       "description": "Vendor information",
       "type": "object",
       "properties": {
+        "tenantId": { "type": "string" },
         "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["local", "foreign"] },
         "userId": { "type": "string" },
         "nif": { "type": "string" },
         "rc": { "type": "string" },
@@ -106,12 +108,47 @@
         "items": { "type": "array" }
       },
       "required": ["transferNumber", "tenantId", "sourceLocation", "destLocation", "status"]
+    },
+    "Export": {
+      "title": "Export",
+      "description": "Exports invoices and proformas",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["proforma", "final"] },
+        "clientName": { "type": "string" },
+        "clientAddress": { "type": "string" },
+        "clientMobile": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "portOfLoading": { "type": "string" },
+        "portOfDischarge": { "type": "string" },
+        "currency": { "type": "string" },
+        "freightAmount": { "type": "number" },
+        "paymentMode": { "type": "string" },
+        "remark": { "type": "string" },
+        "numberOfPackages": { "type": "number" },
+        "totalFob": { "type": "number" },
+        "totalCfr": { "type": "number" },
+        "items": { "type": "array" },
+        "clientBankName": { "type": "string" },
+        "clientBankAddress": { "type": "string" },
+        "clientBankAccount": { "type": "string" },
+        "clientBankSwift": { "type": "string" },
+        "clientBankIban": { "type": "string" }
+      },
+      "required": ["tenantId", "invoiceNumber"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles"
+    },
+    "/exports/{exportId}": {
+      "schema": "Export",
+      "description": "Exports invoices and proformas"
     },
     "/suppliers/{supplierId}": {
       "schema": "Supplier",

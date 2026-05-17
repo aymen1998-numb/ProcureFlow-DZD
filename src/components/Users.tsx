@@ -195,6 +195,7 @@ export default function Users() {
                     <option value="buyer_intl">Acheteur International</option>
                     <option value="magasinier">Magasinier (Unité)</option>
                     <option value="magasinier_central">Magasinier Central</option>
+                    <option value="export">Exportateur</option>
                   </select>
                 </div>
               </div>
@@ -245,6 +246,7 @@ export default function Users() {
                       <option value="buyer_intl">Acheteur International</option>
                       <option value="magasinier">Magasinier (Unité)</option>
                       <option value="magasinier_central">Magasinier Central</option>
+                      <option value="export">Exportateur</option>
                     </select>
                   </div>
                   {formData.role === 'magasinier' && (
