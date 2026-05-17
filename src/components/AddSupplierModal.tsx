@@ -14,6 +14,7 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
   const { user, tenantId } = useAuth();
   const [formData, setFormData] = useState({ 
     name: '', 
+    type: 'local',
     contact: '',
     family: '',
     subFamily: '',
@@ -42,7 +43,7 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
         tenantId: tenantId,
         createdAt: new Date().toISOString() 
       });
-      setFormData({ name: '', contact: '', family: '', subFamily: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
+      setFormData({ name: '', type: 'local', contact: '', family: '', subFamily: '', nif: '', nis: '', rc: '', ai: '', address: '', phone: '', email: '', bankInfo: '' });
       onClose();
     } catch (err: any) {
       console.error(err);
@@ -89,15 +90,28 @@ export default function AddSupplierModal({ isOpen, onClose }: AddSupplierModalPr
                   {error}
                 </div>
               )}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nom de l'établissement</label>
-                <input 
-                  required 
-                  placeholder="ex. SARL ALGER LOG" 
-                  value={formData.name} 
-                  onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Type de Fournisseur</label>
+                  <select 
+                    value={formData.type} 
+                    onChange={e => setFormData({ ...formData, type: e.target.value })} 
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all"
+                  >
+                    <option value="local">Local</option>
+                    <option value="foreign">Étranger</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nom de l'établissement</label>
+                  <input 
+                    required 
+                    placeholder="ex. SARL ALGER LOG" 
+                    value={formData.name} 
+                    onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-[#136AA8] outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all" 
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">

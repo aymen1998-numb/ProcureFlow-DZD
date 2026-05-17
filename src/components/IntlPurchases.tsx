@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
 import { Globe, Plus, Search, Trash2, CheckSquare, Square, FileText, ChevronRight, X, Ship, CreditCard, Box, FileCheck, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import AddSupplierModal from './AddSupplierModal';
 
 export default function IntlPurchases() {
   const { user, tenantId, role } = useAuth();
@@ -13,6 +14,7 @@ export default function IntlPurchases() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -260,18 +262,37 @@ export default function IntlPurchases() {
                 role={role}
                 currentUser={user?.displayName || user?.email}
                 onClose={() => setSelectedPurchase(null)}
+                onAddNewSupplier={() => setIsSupplierModalOpen(true)}
               />
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      <AddSupplierModal isOpen={isSupplierModalOpen} onClose={() => setIsSupplierModalOpen(false)} />
     </div>
   );
 }
 
-function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, currentUser, onClose }: { purchase: any, onUpdate: (data: any) => void, onConfirm: () => void, onUnconfirm: () => void, role: string|null, currentUser: string|null|undefined, onClose: () => void }) {
+function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, currentUser, onClose, onAddNewSupplier }: { purchase: any, onUpdate: (data: any) => void, onConfirm: () => void, onUnconfirm: () => void, role: string|null, currentUser: string|null|undefined, onClose: () => void, onAddNewSupplier: () => void }) {
   const steps = ['proforma', 'payment_processing', 'documents_pending', 'dedouanement', 'completed'];
   const currentStepIdx = steps.indexOf(purchase.status || 'proforma');
+  const { tenantId } = useAuth();
+  const [foreignSuppliers, setForeignSuppliers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    const q = query(
+      collection(db, 'suppliers'),
+      where('tenantId', '==', tenantId),
+      where('type', '==', 'foreign')
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setForeignSuppliers(data);
+    });
+    return () => unsubscribe();
+  }, [tenantId]);
 
   const docs = purchase.documents || { facture: false, bl: false, certOrigin: false, packingList: false, revised: false };
   const allDocsChecked = docs.facture && docs.bl && docs.certOrigin && docs.packingList;
@@ -345,13 +366,27 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Fournisseur / Bénéficiaire</label>
-              <input 
+              <select 
                 value={purchase.supplierName || ''} 
-                onChange={e => onUpdate({ supplierName: e.target.value })}
+                onChange={e => {
+                  if (e.target.value === 'ADD_NEW') {
+                    onAddNewSupplier();
+                  } else {
+                    onUpdate({ supplierName: e.target.value });
+                  }
+                }}
                 disabled={isReadOnly}
-                placeholder="Nom du fournisseur..."
                 className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
-              />
+              >
+                <option value="">Sélectionner un fournisseur...</option>
+                {foreignSuppliers.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+                {(!foreignSuppliers.some(s => s.name === purchase.supplierName) && purchase.supplierName) && (
+                  <option value={purchase.supplierName}>{purchase.supplierName}</option>
+                )}
+                <option value="ADD_NEW">+ Ajouter un fournisseur...</option>
+              </select>
             </div>
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Référence Proforma</label>

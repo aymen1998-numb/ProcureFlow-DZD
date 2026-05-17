@@ -484,29 +484,31 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2 lg:gap-3 ml-2 lg:ml-0">
+            {['admin', 'superadmin', 'buyer', 'buyer_intl'].includes(role || '') && (
+              <button 
+                onClick={() => setIsSupplierModalOpen(true)}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-md font-bold text-[11px] transition-all border border-white/10 uppercase tracking-wide"
+              >
+                <Users size={14} />
+                Nouveau Fournisseur
+              </button>
+            )}
             {role !== 'magasinier' && (
-              <>
-                <button 
-                  onClick={() => setIsSupplierModalOpen(true)}
-                  className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-md font-bold text-[11px] transition-all border border-white/10 uppercase tracking-wide"
-                >
-                  <Users size={14} />
-                  Nouveau Fournisseur
-                </button>
-                <button onClick={() => {
-                  const worksheet = XLSX.utils.json_to_sheet(pos);
-                  const workbook = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(workbook, worksheet, "PurchaseOrders");
-                  XLSX.writeFile(workbook, "Rapport_Commandes.xlsx");
-                }} className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-md font-bold text-[11px] transition-all border border-white/10 uppercase tracking-wide">
-                  <FileSpreadsheet size={14} />
-                  Exporter
-                </button>
-                <button onClick={() => setIsModalOpen(true)} className="bg-[#3B82F6] hover:bg-[#009CDA] text-white px-3 lg:px-4 py-1.5 rounded-md font-bold flex items-center justify-center text-[10px] lg:text-[11px] transition-all shadow-md uppercase tracking-wide whitespace-nowrap">
-                  <Plus size={14} className="sm:hidden" />
-                  <span className="hidden sm:inline">Nouveau Bon de Commande</span>
-                </button>
-              </>
+              <button onClick={() => {
+                const worksheet = XLSX.utils.json_to_sheet(pos);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "PurchaseOrders");
+                XLSX.writeFile(workbook, "Rapport_Commandes.xlsx");
+              }} className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-md font-bold text-[11px] transition-all border border-white/10 uppercase tracking-wide">
+                <FileSpreadsheet size={14} />
+                Exporter
+              </button>
+            )}
+            {['admin', 'superadmin', 'buyer', 'buyer_intl'].includes(role || '') && (
+              <button onClick={() => setIsModalOpen(true)} className="bg-[#3B82F6] hover:bg-[#009CDA] text-white px-3 lg:px-4 py-1.5 rounded-md font-bold flex items-center justify-center text-[10px] lg:text-[11px] transition-all shadow-md uppercase tracking-wide whitespace-nowrap">
+                <Plus size={14} className="sm:hidden" />
+                <span className="hidden sm:inline">Nouveau Bon de Commande</span>
+              </button>
             )}
           </div>
         </header>

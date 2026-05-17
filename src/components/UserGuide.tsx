@@ -3,7 +3,7 @@ import { BookOpen, Factory, ClipboardList, Target, AlertTriangle, Users, BarChar
 import { motion } from 'motion/react';
 
 export default function UserGuide() {
-  const [activeSection, setActiveSection] = useState<'intro' | 'bom' | 'production' | 'variance' | 'roles' | 'kpi'>('intro');
+  const [activeSection, setActiveSection] = useState<'intro' | 'flux' | 'bom' | 'production' | 'variance' | 'roles' | 'kpi'>('intro');
   const [lang, setLang] = useState<'fr' | 'ar'>('fr');
 
   const content = {
@@ -12,6 +12,7 @@ export default function UserGuide() {
       subtitle: 'Apprenez à utiliser la plateforme et maîtriser la gestion de production.',
       nav: {
         intro: 'Introduction & Workflow',
+        flux: 'Flux des Opérations',
         bom: 'Nomenclatures (BOM)',
         production: 'Ordres de Fabrication',
         variance: 'Écarts & Observations',
@@ -28,6 +29,30 @@ export default function UserGuide() {
         step2Desc: 'Planification de la production. Affectation d\'une machine, d\'une équipe et calcul de la demande théorique.',
         step3: 'Clôture & Bilan',
         step3Desc: 'Déclaration des quantités réelles produites et consommées. Identification des pertes et ajustements.',
+      },
+      flux: {
+        title: 'Flux des Opérations & Liaisons',
+        desc: 'Comprendre comment les différents modules interagissent entre eux.',
+        purchases: {
+          title: 'Achats & Commandes (PO / DA)',
+          desc: '1. Demande d\'Achat (DA) : Créée par un département, nécessite une approbation "Finance".\n2. Bon de Commande (PO) : Généré à partir d\'une DA ou directement. \n3. Réception (Stock) : Dès que la commande est "LIVRÉE", les articles sont ajoutés au stock du magasinier (Matières premières ou Produits Finis).'
+        },
+        transfers: {
+          title: 'Transferts Inter-Unités',
+          desc: '1. Demande de transfert d\'une unité à une autre (ex: de HQ vers Barika).\n2. Expédition : Le magasinier source valide l\'expédition (Le stock est déduit mais en transit).\n3. Réception : Le magasinier de destination valide la réception (Le stock est ajouté à son unité).'
+        },
+        production: {
+          title: 'Production & Consommation',
+          desc: '1. Création de l\'OF : Calcul des besoins selon la nomenclature (BOM).\n2. Lancement : L\'OF passe "En Cours".\n3. Clôture : Le responsable déclare la fin. Les matières premières (RM) sont DÉDUITES du stock, et les produits finis (PF) sont AJOUTÉS au stock.'
+        },
+        cash: {
+          title: 'Demandes de Caisse',
+          desc: '1. Un employé ou responsable soumet une demande de fonds (Cash Request).\n2. Approbation "Finance" : Le service financier ou la direction valide la demande.\n3. Décaissement : L\'argent est remis.'
+        },
+        export: {
+          title: 'Dossiers d\'Exportation',
+          desc: '1. Création d\'un dossier d\'export pour un client international.\n2. L\'exportateur génère la Proforma, valide le paiement, puis génère la Facture Finale et la Liste de Colisage.\n3. Suivi du B/L (Bill of Lading) et de l\'arrivée au port.'
+        }
       },
       bom: {
         title: 'Nomenclatures (BOM - Bill of Materials)',
@@ -88,6 +113,7 @@ export default function UserGuide() {
       subtitle: 'تعلم كيفية استخدام المنصة وإتقان إدارة الإنتاج.',
       nav: {
         intro: 'مقدمة وسير العمل',
+        flux: 'تدفق العمليات',
         bom: 'فواتير المواد (BOM)',
         production: 'أوامر التصنيع (O.F.)',
         variance: 'الفروقات والملاحظات',
@@ -104,6 +130,30 @@ export default function UserGuide() {
         step2Desc: 'تخطيط الإنتاج. تخصيص آلة وفريق وحساب الطلب النظري.',
         step3: 'الإغلاق والتقييم',
         step3Desc: 'الإعلان عن الكميات الفعلية المنتجة والمستهلكة. تحديد الخسائر والتعديلات.',
+      },
+      flux: {
+        title: 'تدفق العمليات والروابط',
+        desc: 'فهم كيفية تفاعل الوحدات المختلفة مع بعضها البعض.',
+        purchases: {
+          title: 'المشتريات والطلبات (PO / DA)',
+          desc: '1. طلب الشراء (DA): يتم إنشاؤه بواسطة قسم، ويتطلب موافقة مالية.\n2. أمر الشراء (PO): يتم إنشاؤه من طلب شراء أو مباشرة.\n3. الاستلام (المخزون): عندما يكون الطلب "مُسلّم"، تضاف العناصر إلى مخزون أمين المخزن (مواد خام أو منتجات نهائية).'
+        },
+        transfers: {
+          title: 'التحويلات بين الوحدات',
+          desc: '1. طلب التحويل من وحدة إلى أخرى.\n2. الشحن: يصادق أمين المخزون المصدر (يُخصم المخزون ولكنه قيد النقل).\n3. الاستلام: يصادق أمين مخزن الوجهة (يضاف المخزون إلى وحدته).'
+        },
+        production: {
+          title: 'الإنتاج والاستهلاك',
+          desc: '1. إنشاء أمر التصنيع: حساب الاحتياجات حسب فاتورة المواد (BOM).\n2. الإطلاق: يمر الطلب إلى حالة "قيد التنفيذ".\n3. الإغلاق: يعلن المسؤول النهاية. تُخصم المواد الخام من المخزون وتُضاف المنتجات النهائية إليه.'
+        },
+        cash: {
+          title: 'طلبات الدفع النقدية',
+          desc: '1. يقدم الموظف أو المدير طلب أموال.\n2. الموافقة "المالية": توافق الإدارة المالية أو الإدارة العليا.\n3. الصرف: يتم تسليم الأموال.'
+        },
+        export: {
+          title: 'ملفات التصدير',
+          desc: '1. إنشاء ملف تصدير لعميل دولي.\n2. إنشاء الفاتورة المبدئية، التحقق من الدفع، ثم إنشاء الفاتورة النهائية وقائمة التعبئة.\n3. متابعة بوليصة الشحن (B/L) والوصول إلى الميناء.'
+        }
       },
       bom: {
         title: 'فواتير المواد (BOM - Bill of Materials)',
@@ -163,6 +213,7 @@ export default function UserGuide() {
 
   const navItems = [
     { id: 'intro', label: content[lang].nav.intro, icon: BookOpen },
+    { id: 'flux', label: content[lang].nav.flux, icon: Target },
     { id: 'bom', label: content[lang].nav.bom, icon: ClipboardList },
     { id: 'production', label: content[lang].nav.production, icon: Factory },
     { id: 'variance', label: content[lang].nav.variance, icon: AlertTriangle },
@@ -216,8 +267,8 @@ export default function UserGuide() {
                   }`}
                 >
                   <Icon size={18} />
-                  {item.label}
-                  {isActive && <ChevronRight size={16} className={`${lang === 'ar' ? 'mr-auto rotate-180' : 'ml-auto'}`} />}
+                  <span className="flex-1">{item.label}</span>
+                  {isActive && <ChevronRight size={16} className={`${lang === 'ar' ? 'mr-auto rotate-180 transform' : 'ml-auto'}`} />}
                 </button>
               );
             })}
@@ -229,7 +280,7 @@ export default function UserGuide() {
           {activeSection === 'intro' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="flex items-center gap-4 mb-8 border-b border-slate-100 pb-6">
-                <div className="p-4 bg-indigo-100 text-indigo-600 rounded-2xl"><Target size={32} /></div>
+                <div className="p-4 bg-indigo-100 text-indigo-600 rounded-2xl"><BookOpen size={32} /></div>
                 <div>
                   <h3 className="text-2xl font-black text-slate-800">{t.intro.title}</h3>
                   <p className="text-slate-500 text-sm mt-1">{t.intro.desc}</p>
@@ -255,6 +306,45 @@ export default function UserGuide() {
                   <div className={`absolute top-0 ${lang === 'ar' ? 'left-0 p-4 -translate-x-2' : 'right-0 p-4 translate-x-2'} opacity-10 transform -translate-y-2 group-hover:scale-110 transition-transform`}><CheckCircle2 size={64} /></div>
                   <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><span className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs">3</span> {t.intro.step3}</h4>
                   <p className="text-xs text-slate-500 font-medium">{t.intro.step3Desc}</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeSection === 'flux' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              <div className="flex items-center gap-4 mb-8 border-b border-slate-100 pb-6">
+                <div className="p-4 bg-blue-100 text-blue-600 rounded-2xl"><Target size={32} /></div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-800">{t.flux.title}</h3>
+                  <p className="text-slate-500 text-sm mt-1">{t.flux.desc}</p>
+                </div>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                  <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2"><Globe size={18} className="text-blue-500" /> {t.flux.purchases.title}</h4>
+                  <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{t.flux.purchases.desc}</p>
+                </div>
+                
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                  <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2"><Factory size={18} className="text-emerald-500" /> {t.flux.production.title}</h4>
+                  <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{t.flux.production.desc}</p>
+                </div>
+                
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                  <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2"><ClipboardList size={18} className="text-indigo-500" /> {t.flux.transfers.title}</h4>
+                  <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{t.flux.transfers.desc}</p>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                  <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2"><BarChart3 size={18} className="text-orange-500" /> {t.flux.cash.title}</h4>
+                  <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{t.flux.cash.desc}</p>
+                </div>
+                
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                  <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2"><Target size={18} className="text-purple-500" /> {t.flux.export.title}</h4>
+                  <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{t.flux.export.desc}</p>
                 </div>
               </div>
             </motion.div>
