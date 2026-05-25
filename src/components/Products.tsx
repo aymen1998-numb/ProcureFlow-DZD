@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, addDoc, query, orderBy, deleteDoc, doc, updateDoc, where, getDoc } from 'firebase/firestore';
-import { Plus, Search, Package, Trash2, X, Loader2, FileSpreadsheet, Tag, AlertTriangle, Edit3, ArrowRightLeft, UploadCloud, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Plus, Search, Package, Trash2, X, Loader2, FileSpreadsheet, Tag, AlertTriangle, Edit3, ArrowRightLeft, UploadCloud, ChevronLeft, ChevronRight, Filter, CheckCircle2, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../hooks/useAuth';
@@ -87,6 +87,16 @@ export default function Products() {
     setError(null);
     try {
       if (!tenantId) throw new Error("Tenant ID manquant.");
+
+      const skuValue = formData.sku.trim();
+      const isSkuDuplicate = skuValue !== '' && products.some(p => p.sku?.trim().toUpperCase() === skuValue.toUpperCase());
+      if (isSkuDuplicate) {
+        throw new Error("Le SKU / Référence existe déjà.");
+      }
+      if (skuValue.length < 3) {
+        throw new Error("Le SKU doit contenir au moins 3 caractères.");
+      }
+
       await addDoc(collection(db, 'products'), { 
         ...formData, 
         tenantId: tenantId,
@@ -477,7 +487,57 @@ export default function Products() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">SKU / Référence</label>
-                    <input required placeholder="REF-000X" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold focus:ring-4 focus:ring-blue-50 focus:bg-white outline-none transition-all" />
+                    {(() => {
+                      const skuValue = formData.sku.trim();
+                      const isSkuDuplicate = skuValue !== '' && products.some(p => p.sku?.trim().toUpperCase() === skuValue.toUpperCase());
+                      const isSkuLengthValid = skuValue.length >= 3;
+                      const isSkuValidStatus = skuValue !== '' && isSkuLengthValid && !isSkuDuplicate;
+
+                      let inputBorderClasses = "border-slate-200 focus:ring-blue-50";
+                      if (skuValue !== '') {
+                        inputBorderClasses = isSkuValidStatus 
+                          ? "border-emerald-300 bg-emerald-50/10 focus:ring-emerald-100/50" 
+                          : "border-red-300 bg-red-50/10 focus:ring-red-100/50";
+                      }
+
+                      return (
+                        <>
+                          <div className="relative">
+                            <input 
+                              required 
+                              placeholder="REF-000X" 
+                              value={formData.sku} 
+                              onChange={e => setFormData({ ...formData, sku: e.target.value })} 
+                              className={`w-full p-4 pr-12 bg-slate-50 border rounded-2xl text-sm font-mono font-bold focus:ring-4 focus:bg-white outline-none transition-all ${inputBorderClasses}`} 
+                            />
+                            {skuValue !== '' && (
+                              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center">
+                                {!isSkuValidStatus ? (
+                                  <XCircle size={18} className="text-red-500" />
+                                ) : (
+                                  <CheckCircle2 size={18} className="text-emerald-500" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {skuValue !== '' && isSkuDuplicate && (
+                            <p className="text-[10px] text-red-500 font-bold mt-1 ml-1">
+                              Ce SKU existe déjà !
+                            </p>
+                          )}
+                          {skuValue !== '' && !isSkuLengthValid && (
+                            <p className="text-[10px] text-red-400 font-bold mt-1 ml-1">
+                              Requis: au moins 3 caractères.
+                            </p>
+                          )}
+                          {skuValue !== '' && isSkuValidStatus && (
+                            <p className="text-[10px] text-emerald-600 font-bold mt-1 ml-1">
+                              SKU disponible.
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Catégorie</label>

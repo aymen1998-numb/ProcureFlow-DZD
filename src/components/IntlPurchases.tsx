@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
-import { Globe, Plus, Search, Trash2, CheckSquare, Square, FileText, ChevronRight, X, Ship, CreditCard, Box, FileCheck, Loader2, AlertTriangle } from 'lucide-react';
+import { Globe, Plus, Search, Trash2, CheckSquare, Square, FileText, ChevronRight, X, Ship, CreditCard, Box, FileCheck, Loader2, AlertTriangle, Coins, Truck, TrendingUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AddSupplierModal from './AddSupplierModal';
 
@@ -13,6 +13,8 @@ export default function IntlPurchases() {
   const [purchases, setPurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
 
@@ -125,22 +127,120 @@ export default function IntlPurchases() {
       case 'payment_processing': return 'bg-blue-100 text-blue-800';
       case 'documents_pending': return 'bg-yellow-100 text-yellow-800';
       case 'dedouanement': return 'bg-orange-100 text-orange-800';
-      case 'completed': return 'bg-emerald-100 text-emerald-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed': return 'bg-emerald-100 text-[#10B981]';
+      default: return 'bg-gray-100 text-gray-850';
     }
   };
 
+  const kpis = React.useMemo(() => {
+    let activeCount = 0;
+    let dedouanementCount = 0;
+    let totalDZDTransit = 0;
+    const activeTotals: { [key: string]: number } = { EUR: 0, USD: 0, CNY: 0 };
+
+    purchases.forEach(p => {
+      const isCompleted = p.status === 'completed';
+      if (!isCompleted) {
+        activeCount++;
+      }
+      if (p.status === 'dedouanement') {
+        dedouanementCount++;
+      }
+      
+      const itemsTotal = (p.items || []).reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.unitPrice)), 0);
+      const freight = Number(p.freightAmount) || 0;
+      const cfr = itemsTotal + freight;
+      const currency = p.currency || 'EUR';
+
+      if (!isCompleted && cfr > 0) {
+        activeTotals[currency] = (activeTotals[currency] || 0) + cfr;
+      }
+
+      const douane = Number(p.fraisDouane) || 0;
+      const echange = Number(p.fraisEchange) || 0;
+      totalDZDTransit += (douane + echange);
+    });
+
+    return {
+      activeCount,
+      dedouanementCount,
+      totalDZDTransit,
+      activeTotals
+    };
+  }, [purchases]);
+
   const filteredPurchases = React.useMemo(() => {
-    return purchases.filter(p => 
-      (p.daNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.proformaRef || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [purchases, searchTerm]);
+    return purchases.filter(p => {
+      const pDate = p.createdAt ? p.createdAt.split('T')[0] : '';
+      const matchSearch = (p.daNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.proformaRef || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.transitaire || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.freightAmount?.toString() || '').includes(searchTerm) ||
+        (p.fraisDouane?.toString() || '').includes(searchTerm) ||
+        (p.fraisEchange?.toString() || '').includes(searchTerm) ||
+        (p.items ? p.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0).toString().includes(searchTerm) : false) ||
+        (p.items ? (p.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(p.freightAmount) || 0)).toString().includes(searchTerm) : false);
+      
+      const matchDateFrom = dateFrom ? pDate >= dateFrom : true;
+      const matchDateTo = dateTo ? pDate <= dateTo : true;
+
+      return matchSearch && matchDateFrom && matchDateTo;
+    });
+  }, [purchases, searchTerm, dateFrom, dateTo]);
 
   return (
     <div className="space-y-6">
+      {/* STATS / KPI BAR FOR INTERNATIONAL PURCHASES */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-100 rounded-[1.5rem] p-5 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-50 text-[#136AA8] rounded-2xl flex items-center justify-center font-bold">
+            <Globe className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-black tracking-widest text-slate-400">Dossiers Actifs</div>
+            <div className="text-2xl font-black text-slate-800">{kpis.activeCount}</div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-[1.5rem] p-5 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center font-bold">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-black tracking-widest text-slate-400">Total CFR en cours</div>
+            <div className="text-xs font-black text-slate-800 space-y-0.5">
+              {kpis.activeTotals.EUR > 0 && <div>{kpis.activeTotals.EUR.toLocaleString('fr-FR')} EUR</div>}
+              {kpis.activeTotals.USD > 0 && <div>{kpis.activeTotals.USD.toLocaleString('fr-FR')} USD</div>}
+              {kpis.activeTotals.CNY > 0 && <div>{kpis.activeTotals.CNY.toLocaleString('fr-FR')} CNY</div>}
+              {kpis.activeTotals.EUR === 0 && kpis.activeTotals.USD === 0 && kpis.activeTotals.CNY === 0 && <span className="text-slate-400">0.00 EUR</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-[1.5rem] p-5 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center font-bold">
+            <Truck className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-black tracking-widest text-slate-400">Étape Dédouanement</div>
+            <div className="text-2xl font-black text-slate-800">{kpis.dedouanementCount} dossiers</div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-[1.5rem] p-5 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-emerald-50 text-[#10B981] rounded-2xl flex items-center justify-center font-bold">
+            <Coins className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-black tracking-widest text-slate-400">Total Dédouanements</div>
+            <div className="text-sm font-black text-[#10B981]">{kpis.totalDZDTransit.toLocaleString('fr-FR')} DZD</div>
+            <p className="text-[9px] text-slate-400 font-bold">Douane + Échange (Port)</p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-black text-[#136AA8] tracking-tight flex items-center gap-2">
@@ -148,15 +248,33 @@ export default function IntlPurchases() {
           </h2>
           <p className="text-slate-500 text-sm mt-1 font-medium">Gestion des importations, LC/DP et Dédouanement</p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex bg-white border border-slate-200 rounded-xl px-3 py-2.5 items-center gap-2 shadow-sm w-full sm:w-80 focus-within:ring-2 focus-within:ring-[#136AA8]/20 transition-all">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex bg-white border border-slate-200 rounded-xl px-3 py-2.5 items-center gap-2 shadow-sm w-full sm:w-64 focus-within:ring-2 focus-within:ring-[#136AA8]/20 transition-all">
             <Search size={18} className="text-slate-400" />
             <input 
               type="text" 
-              placeholder="Rechercher N° DA, fournisseur..." 
+              placeholder="Rechercher..." 
               className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none font-medium placeholder:font-normal"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex bg-white border border-slate-200 rounded-xl px-3 py-2 items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-[#136AA8]/20 transition-all">
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Du</span>
+            <input 
+              type="date" 
+              className="bg-transparent border-none focus:ring-0 text-sm outline-none font-medium"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+          </div>
+          <div className="flex bg-white border border-slate-200 rounded-xl px-3 py-2 items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-[#136AA8]/20 transition-all">
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Au</span>
+            <input 
+              type="date" 
+              className="bg-transparent border-none focus:ring-0 text-sm outline-none font-medium"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
             />
           </div>
           {['admin', 'superadmin', 'buyer_intl'].includes(role || '') && (
@@ -180,6 +298,7 @@ export default function IntlPurchases() {
                 <th className="px-5 py-4">Fournisseur</th>
                 <th className="px-5 py-4">Infos Logistique</th>
                 <th className="px-5 py-4">Dédouanement</th>
+                <th className="px-5 py-4 text-right">Total CFR</th>
                 <th className="px-5 py-4 text-center">Paiement</th>
                 <th className="px-5 py-4 text-center">Statut</th>
                 <th className="px-5 py-4 text-right">Actions</th>
@@ -188,14 +307,14 @@ export default function IntlPurchases() {
             <tbody className="divide-y divide-slate-50">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
+                  <td colSpan={8} className="px-5 py-10 text-center text-slate-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Chargement des dossiers...
                   </td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-slate-500 font-medium font-mono">Aucun achat international trouvé.</td>
+                  <td colSpan={8} className="px-5 py-10 text-center text-slate-500 font-medium font-mono">Aucun achat international trouvé.</td>
                 </tr>
               ) : (
                 filteredPurchases.map(p => (
@@ -216,7 +335,23 @@ export default function IntlPurchases() {
                           {p.joursFranchise && (
                             <div className="text-[10px] font-mono mt-0.5 text-slate-500">Fran: {p.joursFranchise} j</div>
                           )}
+                          {((p.fraisDouane || 0) > 0 || (p.fraisEchange || 0) > 0) && (
+                            <div className="text-[10px] font-bold text-orange-600 mt-1">
+                              Transit: {((Number(p.fraisDouane) || 0) + (Number(p.fraisEchange) || 0)).toLocaleString('fr-FR')} DZD
+                            </div>
+                          )}
                         </>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">-</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      {p.items && p.items.length > 0 ? (
+                        <div className="text-sm font-black text-[#136AA8]">
+                          {(
+                            p.items.reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.unitPrice)), 0) + (Number(p.freightAmount) || 0)
+                          ).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {p.currency || 'EUR'}
+                        </div>
                       ) : (
                         <span className="text-slate-400 text-xs italic">-</span>
                       )}
@@ -281,6 +416,31 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
   const currentStepIdx = steps.indexOf(purchase.status || 'proforma');
   const { tenantId } = useAuth();
   const [foreignSuppliers, setForeignSuppliers] = useState<any[]>([]);
+  const [isJsonImportOpen, setIsJsonImportOpen] = useState(false);
+  const [jsonImportText, setJsonImportText] = useState('');
+  const [jsonImportError, setJsonImportError] = useState('');
+
+  const handleJsonImport = () => {
+    try {
+      setJsonImportError('');
+      const parsed = JSON.parse(jsonImportText);
+      const itemsToAdd = Array.isArray(parsed) ? parsed : [parsed];
+      
+      const newItems = itemsToAdd.map((it: any) => ({
+        id: Date.now().toString() + Math.random().toString(),
+        name: it.name || it.description || it.nom || it.article || 'Article',
+        quantity: Number(it.quantity || it.quantite || it.qte || it.qty) || 1,
+        unitPrice: Number(it.unitPrice || it.price || it.prix || it.pu) || 0,
+      }));
+
+      const currentItems = purchase.items || [];
+      onUpdate({ items: [...currentItems, ...newItems] });
+      setIsJsonImportOpen(false);
+      setJsonImportText('');
+    } catch (err) {
+      setJsonImportError('Le format JSON est invalide. Veuillez vérifier la syntaxe.');
+    }
+  };
 
   useEffect(() => {
     if (!tenantId) return;
@@ -572,15 +732,23 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Liste des Articles</label>
                   {!isReadOnly && (
-                    <button 
-                      onClick={() => {
-                        const currentItems = purchase.items || [];
-                        onUpdate({ items: [...currentItems, { id: Date.now().toString(), name: '', quantity: 1, unitPrice: 0 }] });
-                      }}
-                      className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded font-bold uppercase transition flex items-center gap-1"
-                    >
-                      <Plus size={12} /> Ajouter Article
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setIsJsonImportOpen(true)}
+                        className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded font-bold uppercase transition flex items-center gap-1"
+                      >
+                        <FileText size={12} /> Importer JSON
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const currentItems = purchase.items || [];
+                          onUpdate({ items: [...currentItems, { id: Date.now().toString(), name: '', quantity: 1, unitPrice: 0 }] });
+                        }}
+                        className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded font-bold uppercase transition flex items-center gap-1"
+                      >
+                        <Plus size={12} /> Ajouter Article
+                      </button>
+                    </div>
                   )}
                 </div>
                 
@@ -670,24 +838,47 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
 
               {purchase.items && purchase.items.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-slate-200 space-y-1">
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-xs">
                      <span className="text-slate-500 font-bold">Total FOB</span>
                      <span className="font-bold text-slate-700">
                        {(purchase.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}
                      </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-xs">
                      <span className="text-slate-500 font-bold">Fret Total</span>
                      <span className="font-bold text-amber-600">
                        {(Number(purchase.freightAmount) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}
                      </span>
                   </div>
-                  <div className="flex justify-between items-center text-base pt-2">
+                  <div className="flex justify-between items-center text-sm pt-1 border-t border-slate-100">
                      <span className="text-slate-800 font-black">Total CFR</span>
                      <span className="font-black text-[#136AA8]">
                        {(purchase.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(purchase.freightAmount) || 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}
                      </span>
                   </div>
+
+                  {((purchase.fraisDouane || 0) > 0 || (purchase.fraisEchange || 0) > 0) && (
+                    <div className="mt-3 pt-3 border-t border-dashed border-slate-200 space-y-1">
+                      <div className="flex justify-between items-center text-xs">
+                         <span className="text-slate-500">Droits & Taxes Douane:</span>
+                         <span className="font-bold text-orange-600">
+                           {(Number(purchase.fraisDouane) || 0).toLocaleString('fr-FR')} DZD
+                         </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                         <span className="text-slate-500">Frais d'Échange (Port/Conteneur):</span>
+                         <span className="font-bold text-orange-600">
+                           {(Number(purchase.fraisEchange) || 0).toLocaleString('fr-FR')} DZD
+                         </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs font-black text-orange-850 pt-1 border-t border-orange-100/50">
+                         <span>Sous-total Transit (DZD):</span>
+                         <span>
+                           {((Number(purchase.fraisDouane) || 0) + (Number(purchase.fraisEchange) || 0)).toLocaleString('fr-FR')} DZD
+                         </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -881,7 +1072,27 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                   className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
                 />
               </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-orange-600/70 mb-1 block">Frais d'Échange / Services Portuaires (DZD)</label>
+                <input 
+                  type="number"
+                  value={purchase.fraisEchange || ''} 
+                  onChange={e => onUpdate({ fraisEchange: e.target.value ? Number(e.target.value) : null })}
+                  disabled={isReadOnly}
+                  placeholder="0.00"
+                  className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
+                />
+              </div>
             </div>
+
+            {((purchase.fraisDouane || 0) > 0 || (purchase.fraisEchange || 0) > 0) && (
+              <div className="mt-4 bg-[#FFFAEB]/80 border border-amber-200/50 p-3 rounded-xl flex justify-between items-center text-xs font-black text-amber-900 tracking-wide">
+                <span className="uppercase">Total Dédouanement + Échange :</span>
+                <span className="font-mono text-base font-black text-orange-700">
+                  {((Number(purchase.fraisDouane) || 0) + (Number(purchase.fraisEchange) || 0)).toLocaleString('fr-FR')} DZD
+                </span>
+              </div>
+            )}
             
             {purchase.status === 'dedouanement' && !isReadOnly && (
               <div className="mt-6 pt-5 border-t border-orange-200/50 flex justify-end">
@@ -943,6 +1154,67 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
           </div>
         )}
       </div>
+      <AnimatePresence>
+        {isJsonImportOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" onClick={() => setIsJsonImportOpen(false)}>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col" 
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <h3 className="font-bold text-[#136AA8] flex items-center gap-2">
+                   <FileText size={18} /> Importer des Articles depuis JSON
+                 </h3>
+                 <button onClick={() => setIsJsonImportOpen(false)} className="text-slate-400 hover:text-slate-600">
+                   <X size={20} />
+                 </button>
+              </div>
+              <div className="p-4 space-y-3">
+                 <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-200">
+                   Collez votre tableau JSON ci-dessous. Le format attendu : <br />
+                   <code className="block mt-1 font-mono text-[10px] text-slate-600">
+                     [<br/>
+                       &nbsp;&nbsp;&#123; "name": "Pièce Rechange 1", "quantity": 10, "unitPrice": 45.5 &#125;,<br/>
+                       &nbsp;&nbsp;&#123; "name": "Pièce Rechange 2", "quantity": 2, "unitPrice": 120.0 &#125;<br/>
+                     ]
+                   </code>
+                 </div>
+                 
+                 <textarea 
+                   className="w-full h-48 bg-white border border-slate-300 rounded-lg p-3 text-sm font-mono focus:border-[#136AA8] focus:ring-1 focus:ring-[#136AA8] outline-none"
+                   placeholder="Collez le JSON ici..."
+                   value={jsonImportText}
+                   onChange={e => setJsonImportText(e.target.value)}
+                 />
+                 
+                 {jsonImportError && (
+                   <div className="text-xs text-red-500 font-bold bg-red-50 p-2 rounded flex items-center gap-2">
+                     <AlertTriangle size={14} /> {jsonImportError}
+                   </div>
+                 )}
+              </div>
+              <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+                 <button 
+                   onClick={() => setIsJsonImportOpen(false)}
+                   className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors text-sm"
+                 >
+                   Annuler
+                 </button>
+                 <button 
+                   onClick={handleJsonImport}
+                   disabled={!jsonImportText.trim()}
+                   className="bg-[#136AA8] text-white px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-50 hover:bg-blue-800 transition-colors flex items-center gap-2"
+                 >
+                   <CheckSquare size={16} /> Importer
+                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

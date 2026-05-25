@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, useMemo } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
@@ -86,6 +86,8 @@ export default function Dashboard() {
     }
   }, [role]);
   const [pos, setPos] = useState<PO[]>([]);
+  const [intlPurchases, setIntlPurchases] = useState<any[]>([]);
+  const [dashboardType, setDashboardType] = useState<'local' | 'intl'>('local');
   const [products, setProducts] = useState<any[]>([]);
   const [tenantUnits, setTenantUnits] = useState<any[]>([]);
   const [dashboardUnitId, setDashboardUnitId] = useState<string>('all');
@@ -143,6 +145,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user || !tenantId) return;
 
+    if (role === 'buyer_intl') {
+      setDashboardType('intl');
+    }
+
     let q = query(collection(db, 'purchase_orders'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'));
     
     // Buyers only see their own POs
@@ -197,12 +203,18 @@ export default function Dashboard() {
       });
     }
 
+    const intlQuery = query(collection(db, 'intl_purchases'), where('tenantId', '==', tenantId));
+    const intlUnsub = onSnapshot(intlQuery, (snap) => {
+      setIntlPurchases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     const productsUnsub = onSnapshot(query(collection(db, 'products'), where('tenantId', '==', tenantId)), (snap) => {
       setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
     return () => {
       unsubscribe();
+      intlUnsub();
       productsUnsub();
     };
   }, [user, role, tenantId]);
@@ -267,6 +279,58 @@ export default function Dashboard() {
       }
     }).length, icon: AlertTriangle, color: 'red' },
     { label: 'Dépenses Totales', value: `${filteredPos.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0).toLocaleString()} DZD`, icon: TrendingUp, color: 'emerald' }
+  ];
+
+  const intlKpis = useMemo(() => {
+    let activeCount = 0;
+    let dedouanementCount = 0;
+    let totalDZDTransit = 0;
+    const activeTotals: { [key: string]: number } = { EUR: 0, USD: 0, CNY: 0 };
+
+    intlPurchases.forEach(p => {
+      const isCompleted = p.status === 'completed';
+      if (!isCompleted) {
+        activeCount++;
+      }
+      if (p.status === 'dedouanement') {
+        dedouanementCount++;
+      }
+      
+      const itemsTotal = (p.items || []).reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.unitPrice)), 0);
+      const freight = Number(p.freightAmount) || 0;
+      const cfr = itemsTotal + freight;
+      const currency = p.currency || 'EUR';
+
+      if (!isCompleted && cfr > 0) {
+        activeTotals[currency] = (activeTotals[currency] || 0) + cfr;
+      }
+
+      const douane = Number(p.fraisDouane) || 0;
+      const echange = Number(p.fraisEchange) || 0;
+      totalDZDTransit += (douane + echange);
+    });
+
+    return {
+      activeCount,
+      dedouanementCount,
+      totalDZDTransit,
+      activeTotals
+    };
+  }, [intlPurchases]);
+
+  const activeCfrText = useMemo(() => {
+    return [
+      intlKpis.activeTotals.EUR > 0 ? `${intlKpis.activeTotals.EUR.toLocaleString('fr', { maximumFractionDigits: 0 })} €` : '',
+      intlKpis.activeTotals.USD > 0 ? `${intlKpis.activeTotals.USD.toLocaleString('fr', { maximumFractionDigits: 0 })} $` : '',
+      intlKpis.activeTotals.CNY > 0 ? `${intlKpis.activeTotals.CNY.toLocaleString('fr', { maximumFractionDigits: 0 })} ¥` : '',
+    ].filter(Boolean).join(' | ') || '0.00 EUR';
+  }, [intlKpis]);
+
+  const currentStats = dashboardType === 'local' ? stats : [
+    { label: 'Dossiers Actifs', value: intlKpis.activeCount, icon: Globe, color: 'blue' },
+    { label: 'CFR Actif Estimé', value: activeCfrText, icon: TrendingUp, color: 'indigo' },
+    { label: 'Étape Dédouanement', value: `${intlKpis.dedouanementCount} dossiers`, icon: Truck, color: 'orange' },
+    { label: 'Transit (Douane + Échange)', value: `${intlKpis.totalDZDTransit.toLocaleString('fr-FR')} DZD`, icon: Coins, color: 'emerald' },
   ];
 
   return (
@@ -524,38 +588,59 @@ export default function Dashboard() {
               <AnimatePresence mode="wait">
                 {activeTab === 'dashboard' && (
               <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-2xl font-bold text-[#136AA8] tracking-tight">Tableau de Bord</h2>
-                    <p className="text-sm text-gray-500 font-medium">Surveillance des opérations d'achat locale</p>
+                    <p className="text-sm text-gray-400 font-bold mt-1">
+                      {dashboardType === 'local' 
+                        ? "Surveillance des opérations d'achat local" 
+                        : "Surveillance des opérations d'achat international (Importations)"}
+                    </p>
                   </div>
-                  {['admin', 'superadmin'].includes(role || '') && (
-                    <div className="flex items-center gap-2">
-                       <span className="text-sm font-bold text-gray-500">Unité:</span>
-                       <select 
-                         value={dashboardUnitId}
-                         onChange={(e) => setDashboardUnitId(e.target.value)}
-                         className="bg-white border outline-none border-gray-200 text-[#136AA8] text-sm rounded-lg block w-48 p-2 font-bold"
-                       >
-                         <option value="all">Toutes les unités</option>
-                         <option value="HQ">Siège Principal (HQ)</option>
-                         {tenantUnits.map(u => (
-                           <option key={u.id} value={u.id}>{u.name}</option>
-                         ))}
-                       </select>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                      <button
+                        onClick={() => setDashboardType('local')}
+                        className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${dashboardType === 'local' ? 'bg-white text-[#136AA8] shadow-sm' : 'text-slate-400 hover:text-slate-705'}`}
+                      >
+                        Achats Locaux
+                      </button>
+                      <button
+                        onClick={() => setDashboardType('intl')}
+                        className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${dashboardType === 'intl' ? 'bg-white text-[#136AA8] shadow-sm' : 'text-slate-400 hover:text-slate-705'}`}
+                      >
+                        Achats Internationaux
+                      </button>
                     </div>
-                  )}
+
+                    {dashboardType === 'local' && ['admin', 'superadmin'].includes(role || '') && (
+                      <div className="flex items-center gap-2">
+                         <span className="text-sm font-bold text-gray-500 font-mono">Unité:</span>
+                         <select 
+                           value={dashboardUnitId}
+                           onChange={(e) => setDashboardUnitId(e.target.value)}
+                           className="bg-white border outline-none border-gray-200 text-[#136AA8] text-sm rounded-lg block w-48 p-2 font-bold"
+                         >
+                           <option value="all">Toutes les unités</option>
+                           <option value="HQ">Siège Principal (HQ)</option>
+                           {tenantUnits.map(u => (
+                             <option key={u.id} value={u.id}>{u.name}</option>
+                           ))}
+                         </select>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  {stats.map((s, i) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                  {currentStats.map((s, i) => (
                     <div key={i} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-5 translate-y-0 hover:-translate-y-1 transition-all duration-300">
-                      <div className={`w-14 h-14 rounded-2xl bg-${s.color}-50 text-${s.color}-600 flex items-center justify-center border border-${s.color}-100`}>
+                      <div className={`w-14 h-14 rounded-2xl bg-${s.color}-50 text-${s.color}-600 flex items-center justify-center border border-${s.color}-100 shrink-0`}>
                         <s.icon size={26} />
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">{s.label}</p>
-                        <p className="text-xl font-bold text-[#136AA8] font-mono tracking-tighter">{s.value}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5 truncate">{s.label}</p>
+                        <p className="text-sm font-black text-[#136AA8] font-mono tracking-tighter truncate md:text-lg">{s.value}</p>
                       </div>
                     </div>
                   ))}
@@ -563,93 +648,182 @@ export default function Dashboard() {
 
                 <div className="space-y-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h2 className="text-xs font-black text-gray-400 tracking-[0.2em] uppercase">Commandes Récentes</h2>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-2 bg-white rounded-full px-1 py-1 border border-gray-200">
-                        <input
-                          type="date"
-                          value={dateStart}
-                          onChange={(e) => setDateStart(e.target.value)}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-500 bg-transparent outline-none focus:text-[#136AA8]"
-                        />
-                        <span className="text-gray-300 font-bold block">-</span>
-                        <input
-                          type="date"
-                          value={dateEnd}
-                          onChange={(e) => setDateEnd(e.target.value)}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-500 bg-transparent outline-none focus:text-[#136AA8]"
-                        />
+                    <h2 className="text-xs font-black text-gray-400 tracking-[0.2em] uppercase">
+                      {dashboardType === 'local' ? 'Commandes Récentes (Locales)' : 'Dossiers Récents (Achats Internationaux)'}
+                    </h2>
+                    
+                    {dashboardType === 'local' && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 bg-white rounded-full px-1 py-1 border border-gray-200">
+                          <input
+                            type="date"
+                            value={dateStart}
+                            onChange={(e) => setDateStart(e.target.value)}
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-500 bg-transparent outline-none focus:text-[#136AA8]"
+                          />
+                          <span className="text-gray-300 font-bold block">-</span>
+                          <input
+                            type="date"
+                            value={dateEnd}
+                            onChange={(e) => setDateEnd(e.target.value)}
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-500 bg-transparent outline-none focus:text-[#136AA8]"
+                          />
+                        </div>
+                        <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
+                        <div className="flex flex-wrap gap-2">
+                          {['all', 'draft', 'pending_approval', 'approved', 'sent', 'confirmed', 'delivered', 'closed'].map((status) => (
+                          <button
+                            key={status}
+                            onClick={() => setFilterStatus(status)}
+                            className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                              filterStatus === status 
+                                ? 'bg-[#136AA8] text-white border-[#136AA8] shadow-md shadow-blue-100' 
+                                : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-[#009CDA]'
+                            }`}
+                          >
+                            {status === 'all' ? 'Tous' : getStatusLabel(status)}
+                          </button>
+                        ))}
+                        </div>
                       </div>
-                      <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
-                      <div className="flex flex-wrap gap-2">
-                        {['all', 'draft', 'pending_approval', 'approved', 'sent', 'confirmed', 'delivered', 'closed'].map((status) => (
-                        <button
-                          key={status}
-                          onClick={() => setFilterStatus(status)}
-                          className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border ${
-                            filterStatus === status 
-                              ? 'bg-[#136AA8] text-white border-[#136AA8] shadow-md shadow-blue-100' 
-                              : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-[#009CDA]'
-                          }`}
-                        >
-                          {status === 'all' ? 'Tous' : getStatusLabel(status)}
-                        </button>
-                      ))}
-                      </div>
-                    </div>
+                    )}
                   </div>
                   
                   {loading ? (
                     <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#009CDA]" /></div>
-                  ) : filteredPos.length === 0 ? (
-                    <div className="bg-white rounded-2xl p-20 text-center border border-gray-200 shadow-sm">
-                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                        <Package size={28} className="text-gray-300" />
-                      </div>
-                      <h3 className="text-lg font-bold text-[#136AA8] mb-1">Aucune commande active</h3>
-                      <p className="text-gray-400 text-sm max-w-xs mx-auto">Lancez votre flux d'approvisionnement en créant un nouveau bon de commande.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {filteredPos
-                        .filter(p => {
-                          const matchesSearch = (p.poNumber||'').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                              (p.supplierName||'').toLowerCase().includes(searchTerm.toLowerCase());
-                          const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
-                          const pDate = new Date(p.createdAt);
-                          const matchesDateStart = !dateStart || pDate >= new Date(dateStart);
-                          const matchesDateEnd = !dateEnd || pDate <= new Date(dateEnd + 'T23:59:59');
-                          return matchesSearch && matchesStatus && matchesDateStart && matchesDateEnd;
-                        })
-                        .map(p => (
-                        <div 
-                          key={p.id} 
-                          onClick={() => navigate(`/purchase/${p.id}`)}
-                          className="bg-white rounded-[14px] border border-gray-200 shadow-sm hover:shadow-lg transition-all cursor-pointer group flex flex-col h-full"
-                        >
-                          <div className="p-6 flex-1">
-                            <div className="flex justify-between items-start mb-4">
-                              <span className="text-[10px] font-mono font-bold bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-100 tracking-tighter">{p.poNumber}</span>
-                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${getStatusStyle(p.status)}`}>{getStatusLabel(p.status)}</span>
-                            </div>
-                            <h3 className="text-[15px] font-bold text-[#136AA8] mb-2 truncate group-hover:text-[#009CDA] transition-colors uppercase">{p.supplierName}</h3>
-                            <div className="flex items-center gap-2 mb-4">
-                              <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center text-[10px] font-bold text-[#009CDA]">{p.buyerName?.[0]}</div>
-                              <span className="text-[11px] font-medium text-gray-500 tracking-tight">{p.buyerName}</span>
-                            </div>
-                          </div>
-                          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between rounded-b-[14px]">
-                            <div>
-                              <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest leading-none mb-1">Montant Total</p>
-                              <p className="text-lg font-black text-[#136AA8] font-mono leading-none tracking-tighter">{p.totalAmount?.toLocaleString()} <span className="text-[10px] text-gray-400">DZD</span></p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] font-bold text-gray-400 flex items-center gap-1 justify-end"><Clock size={10} /> {new Date(p.createdAt).toLocaleDateString()}</p>
-                            </div>
-                          </div>
+                  ) : dashboardType === 'local' ? (
+                    filteredPos.length === 0 ? (
+                      <div className="bg-white rounded-2xl p-20 text-center border border-gray-200 shadow-sm">
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+                          <Package size={28} className="text-gray-300" />
                         </div>
-                      ))}
-                    </div>
+                        <h3 className="text-lg font-bold text-[#136AA8] mb-1">Aucune commande active</h3>
+                        <p className="text-gray-400 text-sm max-w-xs mx-auto">Lancez votre flux d'approvisionnement en créant un nouveau bon de commande.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {filteredPos
+                          .filter(p => {
+                            const matchesSearch = (p.poNumber||'').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                                (p.supplierName||'').toLowerCase().includes(searchTerm.toLowerCase());
+                            const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
+                            const pDate = new Date(p.createdAt);
+                            const matchesDateStart = !dateStart || pDate >= new Date(dateStart);
+                            const matchesDateEnd = !dateEnd || pDate <= new Date(dateEnd + 'T23:59:59');
+                            return matchesSearch && matchesStatus && matchesDateStart && matchesDateEnd;
+                          })
+                          .map(p => (
+                          <div 
+                            key={p.id} 
+                            onClick={() => navigate(`/purchase/${p.id}`)}
+                            className="bg-white rounded-[14px] border border-gray-200 shadow-sm hover:shadow-lg transition-all cursor-pointer group flex flex-col h-full"
+                          >
+                            <div className="p-6 flex-1">
+                              <div className="flex justify-between items-start mb-4">
+                                <span className="text-[10px] font-mono font-bold bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-100 tracking-tighter">{p.poNumber}</span>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${getStatusStyle(p.status)}`}>{getStatusLabel(p.status)}</span>
+                              </div>
+                              <h3 className="text-[15px] font-bold text-[#136AA8] mb-2 truncate group-hover:text-[#009CDA] transition-colors uppercase">{p.supplierName}</h3>
+                              <div className="flex items-center gap-2 mb-4">
+                                <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center text-[10px] font-bold text-[#009CDA]">{p.buyerName?.[0]}</div>
+                                <span className="text-[11px] font-medium text-gray-500 tracking-tight">{p.buyerName}</span>
+                              </div>
+                            </div>
+                            <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between rounded-b-[14px]">
+                              <div>
+                                <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest leading-none mb-1">Montant Total</p>
+                                <p className="text-lg font-black text-[#136AA8] font-mono leading-none tracking-tighter">{p.totalAmount?.toLocaleString()} <span className="text-[10px] text-gray-400">DZD</span></p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[10px] font-bold text-gray-400 flex items-center gap-1 justify-end"><Clock size={10} /> {new Date(p.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    intlPurchases.length === 0 ? (
+                      <div className="bg-white rounded-2xl p-20 text-center border border-gray-200 shadow-sm">
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+                          <Globe size={28} className="text-gray-300" />
+                        </div>
+                        <h3 className="text-lg font-bold text-[#136AA8] mb-1">Aucun dossier international</h3>
+                        <p className="text-gray-400 text-sm max-w-xs mx-auto">Veuillez initier un dossier d'achat international pour le voir apparaître ici.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {intlPurchases
+                          .filter(p => {
+                            const matchesSearch = (p.daNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                                (p.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase());
+                            return matchesSearch;
+                          })
+                          .map(p => {
+                            const itemsTotal = (p.items || []).reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.unitPrice)), 0);
+                            const freight = Number(p.freightAmount) || 0;
+                            const cfr = itemsTotal + freight;
+                            const douane = Number(p.fraisDouane) || 0;
+                            const echange = Number(p.fraisEchange) || 0;
+                            const transitTotal = douane + echange;
+                            const currency = p.currency || 'EUR';
+
+                            return (
+                              <div 
+                                key={p.id} 
+                                onClick={() => setActiveTab('intl_purchases')}
+                                className="bg-white rounded-[14px] border border-gray-200 shadow-sm hover:shadow-lg transition-all cursor-pointer group flex flex-col h-full"
+                              >
+                                <div className="p-6 flex-1">
+                                  <div className="flex justify-between items-start mb-4">
+                                    <span className="text-[10px] font-mono font-bold bg-slate-50 px-2 py-1 rounded text-slate-500 border border-slate-100 tracking-tighter">{p.daNumber}</span>
+                                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                                      p.status === 'completed' 
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                        : p.status === 'dedouanement' 
+                                          ? 'bg-orange-50 text-[#EA580C] border-orange-100' 
+                                          : p.status === 'documents_pending'
+                                            ? 'bg-yellow-50 text-yellow-700 border-yellow-100'
+                                            : p.status === 'payment_processing'
+                                              ? 'bg-blue-50 text-blue-700 border-blue-105'
+                                              : 'bg-slate-50 text-slate-600 border-slate-200'
+                                    }`}>
+                                      {p.status === 'proforma' ? 'Proforma' : p.status === 'payment_processing' ? 'Paiement' : p.status === 'documents_pending' ? 'Documents' : p.status === 'dedouanement' ? 'Dédouanement' : p.status === 'completed' ? 'Clôturé' : p.status}
+                                    </span>
+                                  </div>
+                                  <h3 className="text-[15px] font-bold text-[#136AA8] mb-2 truncate group-hover:text-[#009CDA] transition-colors uppercase">{p.supplierName || 'Nom de Dossier Direct'}</h3>
+                                  <div className="space-y-1.5 pt-1">
+                                    {p.incoterm && (
+                                      <p className="text-[11px] font-bold text-slate-500">Incoterm: <span className="text-slate-700 uppercase">{p.incoterm}</span></p>
+                                    )}
+                                    {p.paymentMethod && (
+                                      <p className="text-[11px] text-slate-400 font-medium">Paiement: <span className="text-slate-600 font-bold">{p.paymentMethod}</span></p>
+                                    )}
+                                    {transitTotal > 0 && (
+                                      <div className="text-[10px] text-orange-600 font-bold bg-orange-50/50 inline-block px-2 py-0.5 rounded border border-orange-100 mt-1">
+                                        Douane + Échange: {transitTotal.toLocaleString('fr-FR')} DZD
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between rounded-b-[14px]">
+                                  <div>
+                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest leading-none mb-1">Montant Total CFR</p>
+                                    <p className="text-base font-black text-[#136AA8] font-mono leading-none tracking-tighter">
+                                      {cfr.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} <span className="text-[10px] text-slate-400 uppercase">{currency}</span>
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-[10px] font-bold text-gray-400 flex items-center gap-1 justify-end">
+                                      <Clock size={10} /> {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '-'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )
                   )}
                 </div>
               </motion.div>
