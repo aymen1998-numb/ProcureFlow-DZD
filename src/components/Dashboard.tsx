@@ -67,6 +67,7 @@ const CashRequests = lazy(() => import('./CashRequests'));
 const InternalRequests = lazy(() => import('./InternalRequests'));
 const Exports = lazy(() => import('./Exports'));
 const IntlPurchases = lazy(() => import('./IntlPurchases'));
+const PPI = lazy(() => import('./PPI'));
 const Archive = lazy(() => import('./Archive'));
 const RawMaterials = lazy(() => import('./RawMaterials'));
 const BOMs = lazy(() => import('./BOMs'));
@@ -76,7 +77,7 @@ const UserGuide = lazy(() => import('./UserGuide'));
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const { user, role, tenantId, unitId } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'intl_purchases' | 'transfers' | 'suppliers' | 'products' | 'raw_materials' | 'boms' | 'production_orders' | 'user_guide' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings' | 'exports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'da' | 'intl_purchases' | 'ppi' | 'transfers' | 'suppliers' | 'products' | 'raw_materials' | 'boms' | 'production_orders' | 'user_guide' | 'analytics' | 'history' | 'archive' | 'cash' | 'users' | 'settings' | 'exports'>('dashboard');
   
   useEffect(() => {
     if (role === 'magasinier') {
@@ -374,12 +375,20 @@ export default function Dashboard() {
             <FileText size={16} /> {t('da')}
           </button>
           {['admin', 'superadmin', 'buyer_intl'].includes(role || '') && (
-            <button 
-              onClick={() => { setActiveTab('intl_purchases'); setIsMobileMenuOpen(false); }}
-              className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'intl_purchases' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
-            >
-              <Globe size={16} /> {t('intl_purchases')}
-            </button>
+            <>
+              <button 
+                onClick={() => { setActiveTab('intl_purchases'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'intl_purchases' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <Globe size={16} /> {t('intl_purchases')}
+              </button>
+              <button 
+                onClick={() => { setActiveTab('ppi'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition-all ${activeTab === 'ppi' ? 'bg-[#EFF6FF] text-[#136AA8] border-l-4 border-[#136AA8]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'}`}
+              >
+                <ClipboardList size={16} /> Programme PPI
+              </button>
+            </>
           )}
           {role !== 'magasinier' && (
             <button 
@@ -831,6 +840,7 @@ export default function Dashboard() {
 
             {activeTab === 'da' && <motion.div key="da" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><InternalRequests onConvertToPO={handleConvertDAToPO} onConvertToIntlPO={handleConvertDAToIntlPO} /></motion.div>}
             {activeTab === 'intl_purchases' && <motion.div key="intl_purchases" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><IntlPurchases /></motion.div>}
+            {activeTab === 'ppi' && <motion.div key="ppi" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><PPI /></motion.div>}
             {activeTab === 'archive' && <motion.div key="archive" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><Archive /></motion.div>}
             {activeTab === 'user_guide' && <motion.div key="user_guide" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><UserGuide /></motion.div>}
             {activeTab === 'cash' && <motion.div key="cash" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}><CashRequests /></motion.div>}

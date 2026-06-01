@@ -116,6 +116,13 @@ service cloud.firestore {
       allow delete: if isSignedIn() && existing().tenantId == getTenantId();
     }
 
+    match /ppi_items/{itemId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
     match /production_orders/{orderId} {
       allow read: if isSignedIn() && existing().tenantId == getTenantId();
       allow create: if isSignedIn() && incoming().tenantId == getTenantId();
