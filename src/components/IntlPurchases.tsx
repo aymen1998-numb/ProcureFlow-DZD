@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
-import { Globe, Plus, Search, Trash2, CheckSquare, Square, FileText, ChevronRight, X, Ship, CreditCard, Box, FileCheck, Loader2, AlertTriangle, Coins, Truck, TrendingUp } from 'lucide-react';
+import { Globe, Plus, Search, Trash2, CheckSquare, Square, FileText, ChevronRight, X, Ship, CreditCard, Box, FileCheck, Loader2, AlertTriangle, Coins, Truck, TrendingUp, Printer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AddSupplierModal from './AddSupplierModal';
 
@@ -421,6 +421,163 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
   const [isJsonImportOpen, setIsJsonImportOpen] = useState(false);
   const [jsonImportText, setJsonImportText] = useState('');
   const [jsonImportError, setJsonImportError] = useState('');
+
+  const handlePrintRevient = () => {
+    const newWindow = window.open('', '_blank');
+    if (!newWindow) {
+      alert('Veuillez autoriser les pop-ups pour imprimer la facture.');
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="UTF-8">
+        <title>Facture de Revient - ${purchase.daNumber}</title>
+        <style>
+          body { font-family: 'Inter', system-ui, sans-serif; padding: 40px; color: #111827; line-height: 1.5; font-size: 14px; }
+          .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; }
+          .header h1 { margin: 0; font-size: 24px; color: #111827; text-transform: uppercase; letter-spacing: 1px; }
+          .header p { margin: 5px 0 0 0; color: #6b7280; font-size: 12px; }
+          
+          .info-grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
+          .info-box { padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; width: 48%; background: #f9fafb; }
+          .info-box h3 { margin: 0 0 10px 0; font-size: 11px; text-transform: uppercase; color: #6b7280; letter-spacing: 1px; }
+          .info-box p { margin: 4px 0; font-weight: bold; }
+          .info-box span { font-weight: normal; color: #6b7280; }
+          
+          table { width: 100%; border-collapse: collapse; margin-block: 20px; }
+          th, td { border: 1px solid #e5e7eb; padding: 12px; text-align: left; }
+          th { background-color: #f3f4f6; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #374151; font-weight: bold; }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+          
+          .summary-section { margin-top: 30px; display: flex; justify-content: flex-end; }
+          .summary-box { width: 350px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+          .summary-row { display: flex; justify-content: space-between; padding: 10px 15px; border-bottom: 1px solid #e5e7eb; }
+          .summary-row:last-child { border-bottom: none; background-color: #f0fdf4; font-weight: bold; font-size: 16px; color: #166534; }
+          .summary-label { color: #4b5563; }
+          .summary-value { font-family: monospace; font-weight: bold; }
+          
+          .footer { margin-top: 60px; font-size: 10px; color: #9ca3af; text-align: center; border-top: 1px dashed #e5e7eb; padding-top: 20px; }
+          
+          @media print {
+            body { padding: 0; }
+            button { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Fiche de Revient (DZD)</h1>
+          <p>Dossier N° ${purchase.daNumber} | Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
+        </div>
+        
+        <div class="info-grid">
+          <div class="info-box">
+            <h3>Informations Générales</h3>
+            <p><span>Fournisseur:</span> ${purchase.supplierName || 'N/A'}</p>
+            <p><span>Réf Proforma:</span> ${purchase.proformaRef || 'N/A'}</p>
+            <p><span>Facture:</span> ${purchase.invoiceNumber || 'N/A'}</p>
+            <p><span>Incoterm:</span> ${purchase.incoterm || 'N/A'}</p>
+          </div>
+          <div class="info-box">
+            <h3>Paramètres Financiers</h3>
+            <p><span>Devise:</span> ${purchase.currency || 'EUR'}</p>
+            <p><span>Taux de Change:</span> ${purchase.tauxEchange || 0} DZD</p>
+            <p><span>Total Fret:</span> ${(Number(purchase.freightAmount) || 0).toLocaleString('fr-FR')} ${purchase.currency || 'EUR'}</p>
+            <p><span>Total Douane & Transit:</span> ${((Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0)).toLocaleString('fr-FR')} DZD</p>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Article</th>
+              <th class="text-center">Qté</th>
+              <th class="text-right">FOB (${purchase.currency || 'EUR'})</th>
+              <th class="text-right">Unitaire ${purchase.incoterm === 'CPT' ? 'CPT' : 'CFR'} (${purchase.currency || 'EUR'})</th>
+              <th class="text-right" style="background-color: #ecfdf5; color: #065f46;">Revient Unitaire (DZD)</th>
+              <th class="text-right" style="background-color: #ecfdf5; color: #065f46;">Revient Total (DZD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(purchase.items || []).map((item: any) => {
+              const calculatedTotalFOB = (purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0);
+              const totalGrossWeight = (purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.grossWeight) || 0), 0);
+              const freight = Number(purchase.freightAmount) || 0;
+              const weightRatio = totalGrossWeight > 0 ? ((Number(item.grossWeight) || 0) / totalGrossWeight) : calculatedTotalFOB > 0 ? ((Number(item.quantity) * Number(item.unitPrice)) / calculatedTotalFOB) : 0;
+              
+              const itemTotalFreight = freight * weightRatio;
+              const itemQty = Number(item.quantity) || 1;
+              const unitCfr = Number(item.unitPrice) + (itemTotalFreight / itemQty);
+              
+              const tauxEchange = Number(purchase.tauxEchange) || 0;
+              const totalTransitDZD = (Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0);
+              const itemTotalTransitDZD = totalTransitDZD * weightRatio;
+              
+              const unitRevientDZD = tauxEchange > 0 ? (unitCfr * tauxEchange) + (itemTotalTransitDZD / itemQty) : 0;
+              const totalRevientDZD = unitRevientDZD * itemQty;
+              
+              return `
+                <tr>
+                  <td>
+                    <div style="font-weight: bold;">${item.name || 'Article'}</div>
+                    ${item.grossWeight > 0 ? `<div style="font-size: 10px; color: #6b7280; font-family: monospace;">Poids: ${item.grossWeight} kg</div>` : ''}
+                  </td>
+                  <td class="text-center">${itemQty} ${item.unit || 'pcs'}</td>
+                  <td class="text-right">${Number(item.unitPrice).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td class="text-right">${unitCfr.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td class="text-right" style="font-weight: bold; color: #065f46;">${unitRevientDZD.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td class="text-right" style="font-weight: bold; color: #065f46;">${totalRevientDZD.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <div class="summary-section">
+          <div class="summary-box">
+            <div class="summary-row">
+              <span class="summary-label">Total FOB:</span>
+              <span class="summary-value">${((purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ${purchase.currency || 'EUR'}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Fret Global:</span>
+              <span class="summary-value">${(Number(purchase.freightAmount) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ${purchase.currency || 'EUR'}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Total ${purchase.incoterm === 'CPT' ? 'CPT' : 'CFR'} (Devise):</span>
+              <span class="summary-value">${((purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(purchase.freightAmount) || 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ${purchase.currency || 'EUR'}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Frais Douane & Transit (DZD):</span>
+              <span class="summary-value">${((Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0)).toLocaleString('fr-FR')} DZD</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">COÛT DE REVIENT TOTAL:</span>
+              <span class="summary-value">${((((purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(purchase.freightAmount) || 0)) * (Number(purchase.tauxEchange) || 0)) + ((Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0))).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} DZD</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="footer">
+          Document généré par le Système de Gestion des Achats Internationaux
+        </div>
+        <script>
+          setTimeout(() => {
+            window.print();
+            window.close();
+          }, 300);
+        </script>
+      </body>
+      </html>
+    `;
+    
+    newWindow.document.write(htmlContent);
+    newWindow.document.close();
+  };
 
   const handleJsonImport = () => {
     try {
@@ -955,9 +1112,18 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                   
                   {(purchase.tauxEchange || 0) > 0 && (
                     <div className="mt-4 bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
-                      <h4 className="text-xs font-black uppercase text-emerald-800 tracking-widest mb-3 flex items-center gap-2">
-                        <FileText size={14} /> Fiche de Revient (DZD)
-                      </h4>
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-xs font-black uppercase text-emerald-800 tracking-widest flex items-center gap-2">
+                          <FileText size={14} /> Fiche de Revient (DZD)
+                        </h4>
+                        <button 
+                          onClick={handlePrintRevient}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+                        >
+                          <Printer size={12} />
+                          Imprimer
+                        </button>
+                      </div>
                       <div className="space-y-1.5 text-xs text-emerald-700">
                         <div className="flex justify-between">
                           <span>Total Marchandise + Fret (Devise):</span>
