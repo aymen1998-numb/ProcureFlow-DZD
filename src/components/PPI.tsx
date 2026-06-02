@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
-import { Plus, Trash2, Box, Calendar, FileText, CheckCircle2, X, AlertTriangle, CheckSquare } from 'lucide-react';
+import { Plus, Trash2, Box, Calendar, FileText, CheckCircle2, X, AlertTriangle, CheckSquare, Building2, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface PPIItem {
   id: string;
   category: 'equipment' | 'aapi' | 'fonctionnement';
   period: string; // e.g., "S1 2026"
+  bank: string; // البنك
   tariffCode: string; // البند التعريفي
   subTariffCode: string; // البند التعريفي الفرعي
   productName: string; // تسمية المنتج
@@ -26,6 +27,8 @@ export default function PPI() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<'equipment' | 'aapi' | 'fonctionnement'>('equipment');
   const [currentPeriod, setCurrentPeriod] = useState<string>('S1 2026');
+  const [bankFilter, setBankFilter] = useState<string>('All');
+  const [searchTerm, setSearchTerm] = useState('');
   const [isJsonImportOpen, setIsJsonImportOpen] = useState(false);
   const [jsonImportText, setJsonImportText] = useState('');
   const [jsonImportError, setJsonImportError] = useState('');
@@ -43,12 +46,13 @@ export default function PPI() {
     return () => unsub();
   }, [tenantId]);
 
-  const handleAddItem = async () => {
+  const handleAddItem = async (bankName?: string) => {
     if (!tenantId) return;
     const newItem = {
       tenantId,
       category: activeCategory,
       period: currentPeriod,
+      bank: bankName || '',
       tariffCode: '',
       subTariffCode: '',
       productName: '',
@@ -75,6 +79,7 @@ export default function PPI() {
           tenantId,
           category: activeCategory,
           period: currentPeriod,
+          bank: String(item.bank || item.banque || item['البنك'] || ''),
           tariffCode: String(item.tariffCode || item.code || item['البند التعريفي'] || ''),
           subTariffCode: String(item.subTariffCode || item.subCode || item['البند التعريفي الفرعي'] || ''),
           productName: String(item.productName || item.name || item.nom || item['تسمية المنتج'] || item.description || ''),
@@ -107,7 +112,23 @@ export default function PPI() {
     }
   };
 
-  const filteredItems = items.filter(i => i.category === activeCategory && i.period === currentPeriod);
+  const filteredItems = items.filter(i => 
+    i.category === activeCategory && 
+    i.period === currentPeriod &&
+    (bankFilter === 'All' || (i.bank && i.bank.toLowerCase().includes(bankFilter.toLowerCase()))) &&
+    (searchTerm === '' || (i.productName && i.productName.toLowerCase().includes(searchTerm.toLowerCase())) || (i.tariffCode && i.tariffCode.includes(searchTerm)))
+  );
+
+  const groupedItems = filteredItems.reduce((acc, item) => {
+    const b = item.bank && item.bank.trim() !== '' ? item.bank : 'Sans Banque';
+    if (!acc[b]) acc[b] = [];
+    acc[b].push(item);
+    return acc;
+  }, {} as Record<string, PPIItem[]>);
+
+  const groupedKeys = Object.keys(groupedItems).sort();
+
+  const uniqueBanks = Array.from(new Set(items.filter(i => i.category === activeCategory && i.period === currentPeriod && i.bank && i.bank.trim() !== '').map(i => i.bank)));
 
   return (
     <div className="space-y-6">
@@ -119,19 +140,44 @@ export default function PPI() {
           <p className="text-slate-500 text-sm mt-1 font-medium">Gestion des quotas et prévisions d'importation semestrielles</p>
         </div>
         
-        <div className="flex items-center gap-3 bg-white p-2 border border-slate-200 rounded-[12px] shadow-sm">
-          <Calendar size={18} className="text-slate-400" />
-          <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Période:</span>
-          <select 
-            value={currentPeriod} 
-            onChange={(e) => setCurrentPeriod(e.target.value)}
-            className="bg-transparent text-sm font-black text-[#136AA8] outline-none border-none py-1 lg:pl-1 pr-8"
-          >
-            <option value="S1 2025">S1 2025</option>
-            <option value="S2 2025">S2 2025</option>
-            <option value="S1 2026">S1 2026</option>
-            <option value="S2 2026">S2 2026</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <div className="flex items-center gap-2 bg-white px-3 py-2 border border-slate-200 rounded-[12px] shadow-sm flex-1 lg:flex-none">
+            <Search size={18} className="text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Rechercher produit..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none text-sm outline-none w-full placeholder-slate-400"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 bg-white p-2 border border-slate-200 rounded-[12px] shadow-sm">
+            <span className="text-sm font-bold text-slate-500 uppercase tracking-widest pl-2">Banque:</span>
+            <select 
+              value={bankFilter} 
+              onChange={(e) => setBankFilter(e.target.value)}
+              className="bg-transparent text-sm font-black text-[#136AA8] outline-none border-none py-1 lg:pl-1 pr-8"
+            >
+              <option value="All">Toutes les banques</option>
+              {uniqueBanks.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3 bg-white p-2 border border-slate-200 rounded-[12px] shadow-sm">
+            <Calendar size={18} className="text-slate-400" />
+            <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Période:</span>
+            <select 
+              value={currentPeriod} 
+              onChange={(e) => setCurrentPeriod(e.target.value)}
+              className="bg-transparent text-sm font-black text-[#136AA8] outline-none border-none py-1 lg:pl-1 pr-8"
+            >
+              <option value="S1 2025">S1 2025</option>
+              <option value="S2 2025">S2 2025</option>
+              <option value="S1 2026">S1 2026</option>
+              <option value="S2 2026">S2 2026</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -162,149 +208,187 @@ export default function PPI() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-              <tr>
-                <th className="px-4 py-3 whitespace-nowrap">البند التعريفي<br/><span className="text-[10px] uppercase font-normal">Tariff Code</span></th>
-                <th className="px-4 py-3 whitespace-nowrap">البند التعريفي الفرعي<br/><span className="text-[10px] uppercase font-normal">Sub-tariff Code</span></th>
-                <th className="px-4 py-3 min-w-[200px]">تسمية المنتج<br/><span className="text-[10px] uppercase font-normal">Product Name</span></th>
-                <th className="px-4 py-3 whitespace-nowrap text-center">الوحدة<br/><span className="text-[10px] uppercase font-normal">Unit</span></th>
-                <th className="px-4 py-3 whitespace-nowrap text-right">حالة المخزونات<br/><span className="text-[10px] uppercase font-normal">Stock</span></th>
-                <th className="px-4 py-3 whitespace-nowrap text-right">قيد التخليص<br/><span className="text-[10px] uppercase font-normal">In Clearance</span></th>
-                <th className="px-4 py-3 whitespace-nowrap text-right">المطلوب استرادها<br/><span className="text-[10px] uppercase font-normal">Requested (Max)</span></th>
-                <th className="px-4 py-3 whitespace-nowrap text-right text-blue-700">المستهلكة<br/><span className="text-[10px] uppercase font-normal">Consumed</span></th>
-                <th className="px-4 py-3 whitespace-nowrap text-right text-emerald-700">المتبقية<br/><span className="text-[10px] uppercase font-normal">Remaining</span></th>
-                <th className="px-4 py-3">ملاحظات<br/><span className="text-[10px] uppercase font-normal">Remarks</span></th>
-                <th className="px-4 py-3 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-slate-400 font-medium">
-                    Aucun article défini pour cette période et catégorie.
-                  </td>
-                </tr>
-              ) : (
-                filteredItems.map(item => {
-                  const remaining = Number(item.requestedQuantity || 0) - Number(item.consumedQuantity || 0);
-                  const remainingClass = remaining < 0 ? 'text-red-500' : remaining === 0 ? 'text-slate-400' : 'text-emerald-600';
-                  
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="px-4 py-2">
-                        <input 
-                          type="text" 
-                          value={item.tariffCode} 
-                          onChange={(e) => handleUpdateItem(item.id, 'tariffCode', e.target.value)}
-                          className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs outline-none" 
-                          placeholder="Ex: 8504"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="text" 
-                          value={item.subTariffCode} 
-                          onChange={(e) => handleUpdateItem(item.id, 'subTariffCode', e.target.value)}
-                          className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs outline-none" 
-                          placeholder="Ex: 8504.40.90"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="text" 
-                          value={item.productName} 
-                          onChange={(e) => handleUpdateItem(item.id, 'productName', e.target.value)}
-                          className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-bold text-xs outline-none" 
-                          placeholder="Nom du produit..."
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="text" 
-                          value={item.unit} 
-                          onChange={(e) => handleUpdateItem(item.id, 'unit', e.target.value)}
-                          className="w-full text-center bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs text-slate-500 outline-none" 
-                          placeholder="U/KG/T..."
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="number" 
-                          value={item.stockStatus} 
-                          onChange={(e) => handleUpdateItem(item.id, 'stockStatus', Number(e.target.value))}
-                          className="w-full text-right bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs outline-none" 
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="number" 
-                          value={item.customsClearance} 
-                          onChange={(e) => handleUpdateItem(item.id, 'customsClearance', Number(e.target.value))}
-                          className="w-full text-right bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs outline-none" 
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="number" 
-                          value={item.requestedQuantity} 
-                          onChange={(e) => handleUpdateItem(item.id, 'requestedQuantity', Number(e.target.value))}
-                          className="w-full text-right bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs font-black text-[#136AA8] outline-none" 
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="number" 
-                          value={item.consumedQuantity} 
-                          onChange={(e) => handleUpdateItem(item.id, 'consumedQuantity', Number(e.target.value))}
-                          className="w-full text-right bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs font-bold text-blue-700 bg-blue-50/50 outline-none" 
-                          title="Quantité déjà importée"
-                        />
-                      </td>
-                      <td className={`px-4 py-2 text-right font-mono text-sm font-black ${remainingClass}`}>
-                        {remaining}
-                      </td>
-                      <td className="px-4 py-2">
-                        <input 
-                          type="text" 
-                          value={item.remarks} 
-                          onChange={(e) => handleUpdateItem(item.id, 'remarks', e.target.value)}
-                          className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded text-[11px] text-slate-500 outline-none" 
-                          placeholder="Remarques..."
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <button 
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {groupedKeys.length === 0 ? (
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
+          <p className="text-slate-400 font-medium mb-4">Aucun article défini pour cette période et catégorie ou ne correspondant à la recherche.</p>
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => setIsJsonImportOpen(true)}
+              className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors uppercase tracking-widest shadow-sm"
+            >
+              <FileText size={14} /> Importer JSON
+            </button>
+            <button
+              onClick={() => handleAddItem()}
+              className="bg-[#136AA8] text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-blue-800 transition-colors uppercase tracking-widest shadow-sm"
+            >
+              <Plus size={14} /> Ajouter une ligne
+            </button>
+          </div>
         </div>
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-          <button
-            onClick={() => setIsJsonImportOpen(true)}
-            className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors uppercase tracking-widest shadow-sm"
-          >
-            <FileText size={14} /> Importer JSON
-          </button>
-          <button
-            onClick={handleAddItem}
-            className="bg-[#136AA8] text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-blue-800 transition-colors uppercase tracking-widest shadow-sm"
-          >
-            <Plus size={14} /> Ajouter une ligne
-          </button>
+      ) : (
+        <div className="space-y-8">
+          {groupedKeys.map(bankName => {
+            const itemsInBank = groupedItems[bankName];
+            return (
+              <div key={bankName} className="mb-4">
+                <div className="flex items-center gap-3 mb-3 pl-1">
+                  <Building2 className="text-[#136AA8]" size={20} />
+                  <h3 className="text-lg font-black text-[#136AA8] uppercase tracking-wider">{bankName}</h3>
+                  <button onClick={() => handleAddItem(bankName === 'Sans Banque' ? '' : bankName)} className="ml-auto flex items-center gap-1 text-xs font-bold text-[#136AA8] bg-[#EFF6FF] px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
+                    <Plus size={14} /> Ajouter un article
+                  </button>
+                </div>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3 whitespace-nowrap">البنك<br/><span className="text-[10px] uppercase font-normal">Banque</span></th>
+                          <th className="px-4 py-3 whitespace-nowrap">البند التعريفي<br/><span className="text-[10px] uppercase font-normal">Tariff Code</span></th>
+                          <th className="px-4 py-3 whitespace-nowrap">البند التعريفي الفرعي<br/><span className="text-[10px] uppercase font-normal">Sub-tariff Code</span></th>
+                          <th className="px-4 py-3 min-w-[200px]">تسمية المنتج<br/><span className="text-[10px] uppercase font-normal">Product Name</span></th>
+                          <th className="px-4 py-3 whitespace-nowrap text-center">الوحدة<br/><span className="text-[10px] uppercase font-normal">Unit</span></th>
+                          <th className="px-4 py-3 whitespace-nowrap text-right">حالة المخزونات<br/><span className="text-[10px] uppercase font-normal">Stock</span></th>
+                          <th className="px-4 py-3 whitespace-nowrap text-right">قيد التخليص<br/><span className="text-[10px] uppercase font-normal">In Clearance</span></th>
+                          <th className="px-4 py-3 whitespace-nowrap text-right">المطلوب استرادها<br/><span className="text-[10px] uppercase font-normal">Requested (Max)</span></th>
+                          <th className="px-4 py-3 whitespace-nowrap text-right text-blue-700">المستهلكة<br/><span className="text-[10px] uppercase font-normal">Consumed</span></th>
+                          <th className="px-4 py-3 whitespace-nowrap text-right text-emerald-700">المتبقية<br/><span className="text-[10px] uppercase font-normal">Remaining</span></th>
+                          <th className="px-4 py-3">ملاحظات<br/><span className="text-[10px] uppercase font-normal">Remarks</span></th>
+                          <th className="px-4 py-3 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {itemsInBank.map(item => {
+                          const remaining = Number(item.requestedQuantity || 0) - Number(item.consumedQuantity || 0);
+                          const remainingClass = remaining < 0 ? 'text-red-500' : remaining === 0 ? 'text-slate-400' : 'text-emerald-600';
+                          
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={item.bank || ''} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'bank', e.target.value)}
+                                  className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-bold text-xs outline-none" 
+                                  placeholder="AGB, SGA..."
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={item.tariffCode} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'tariffCode', e.target.value)}
+                                  className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs outline-none" 
+                                  placeholder="Ex: 8504"
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={item.subTariffCode} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'subTariffCode', e.target.value)}
+                                  className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs outline-none" 
+                                  placeholder="Ex: 8504.40.90"
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={item.productName} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'productName', e.target.value)}
+                                  className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-bold text-xs outline-none" 
+                                  placeholder="Nom du produit..."
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={item.unit} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'unit', e.target.value)}
+                                  className="w-full text-center bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs text-slate-500 outline-none" 
+                                  placeholder="U/KG/T..."
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="number" 
+                                  value={item.stockStatus} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'stockStatus', Number(e.target.value))}
+                                  className="w-full text-right bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs outline-none" 
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="number" 
+                                  value={item.customsClearance} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'customsClearance', Number(e.target.value))}
+                                  className="w-full text-right bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs outline-none" 
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="number" 
+                                  value={item.requestedQuantity} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'requestedQuantity', Number(e.target.value))}
+                                  className="w-full text-right bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs font-black text-[#136AA8] outline-none" 
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="number" 
+                                  value={item.consumedQuantity} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'consumedQuantity', Number(e.target.value))}
+                                  className="w-full text-right bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded font-mono text-xs font-bold text-blue-700 bg-blue-50/50 outline-none" 
+                                  title="Quantité déjà importée"
+                                />
+                              </td>
+                              <td className={`px-4 py-2 text-right font-mono text-sm font-black ${remainingClass}`}>
+                                {remaining}
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={item.remarks} 
+                                  onChange={(e) => handleUpdateItem(item.id, 'remarks', e.target.value)}
+                                  className="w-full bg-transparent border-none p-1 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded text-[11px] text-slate-500 outline-none" 
+                                  placeholder="Remarques..."
+                                />
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <button 
+                                  onClick={() => handleDeleteItem(item.id)}
+                                  className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex justify-end gap-3 mt-8">
+            <button
+              onClick={() => setIsJsonImportOpen(true)}
+              className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors uppercase tracking-widest shadow-sm border-none"
+            >
+              <FileText size={14} /> Importer JSON
+            </button>
+            <button
+              onClick={() => handleAddItem()}
+              className="bg-[#136AA8] text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-blue-800 transition-colors uppercase tracking-widest shadow-sm border-none"
+            >
+              <Plus size={14} /> Ajouter Banque / Ligne
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <AnimatePresence>
         {isJsonImportOpen && (
@@ -329,8 +413,8 @@ export default function PPI() {
                    Collez votre tableau JSON ci-dessous. Exemple : <br />
                    <code className="block mt-1 font-mono text-[10px] text-slate-600">
                      [<br/>
-                       &nbsp;&nbsp;&#123; "tariffCode": "8401", "name": "Produit 1", "quantity": 10 &#125;,<br/>
-                       &nbsp;&nbsp;&#123; "tariffCode": "8402", "name": "Produit 2", "quantity": 5 &#125;<br/>
+                       &nbsp;&nbsp;&#123; "banque": "AGB", "tariffCode": "8401", "name": "Produit 1", "quantity": 10 &#125;,<br/>
+                       &nbsp;&nbsp;&#123; "banque": "SGA", "tariffCode": "8402", "name": "Produit 2", "quantity": 5 &#125;<br/>
                      ]
                    </code>
                  </div>

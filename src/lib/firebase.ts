@@ -43,6 +43,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo, null, 2));
+  
+  // Do not crash the app for offline errors, as they are usually transient in the iframe
+  if (errInfo.error.includes('offline') || errInfo.error.includes('unavailable')) {
+    console.warn("Firebase client is currently offline. Retrying automatically in the background...");
+    return;
+  }
+  
   throw new Error(JSON.stringify(errInfo));
 }
 

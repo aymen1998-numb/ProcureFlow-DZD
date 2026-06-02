@@ -157,8 +157,9 @@ export default function IntlPurchases() {
       }
 
       const douane = Number(p.fraisDouane) || 0;
-      const echange = Number(p.fraisEchange) || 0;
-      totalDZDTransit += (douane + echange);
+      const echange = p.incoterm === 'CPT' ? 0 : (Number(p.fraisEchange) || 0);
+      const magasinage = Number(p.fraisMagasinage) || 0;
+      totalDZDTransit += (douane + echange + magasinage);
     });
 
     return {
@@ -180,6 +181,7 @@ export default function IntlPurchases() {
         (p.freightAmount?.toString() || '').includes(searchTerm) ||
         (p.fraisDouane?.toString() || '').includes(searchTerm) ||
         (p.fraisEchange?.toString() || '').includes(searchTerm) ||
+        (p.fraisMagasinage?.toString() || '').includes(searchTerm) ||
         (p.items ? p.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0).toString().includes(searchTerm) : false) ||
         (p.items ? (p.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(p.freightAmount) || 0)).toString().includes(searchTerm) : false);
       
@@ -209,7 +211,7 @@ export default function IntlPurchases() {
             <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-[10px] uppercase font-black tracking-widest text-slate-400">Total CFR en cours</div>
+            <div className="text-[10px] uppercase font-black tracking-widest text-slate-400">Total CFR/CPT en cours</div>
             <div className="text-xs font-black text-slate-800 space-y-0.5">
               {kpis.activeTotals.EUR > 0 && <div>{kpis.activeTotals.EUR.toLocaleString('fr-FR')} EUR</div>}
               {kpis.activeTotals.USD > 0 && <div>{kpis.activeTotals.USD.toLocaleString('fr-FR')} USD</div>}
@@ -298,7 +300,7 @@ export default function IntlPurchases() {
                 <th className="px-5 py-4">Fournisseur</th>
                 <th className="px-5 py-4">Infos Logistique</th>
                 <th className="px-5 py-4">Dédouanement</th>
-                <th className="px-5 py-4 text-right">Total CFR</th>
+                <th className="px-5 py-4 text-right">Total CFR/CPT</th>
                 <th className="px-5 py-4 text-center">Paiement</th>
                 <th className="px-5 py-4 text-center">Statut</th>
                 <th className="px-5 py-4 text-right">Actions</th>
@@ -335,9 +337,9 @@ export default function IntlPurchases() {
                           {p.joursFranchise && (
                             <div className="text-[10px] font-mono mt-0.5 text-slate-500">Fran: {p.joursFranchise} j</div>
                           )}
-                          {((p.fraisDouane || 0) > 0 || (p.fraisEchange || 0) > 0) && (
+                          {((p.fraisDouane || 0) > 0 || (p.incoterm !== 'CPT' && (p.fraisEchange || 0) > 0) || (p.fraisMagasinage || 0) > 0) && (
                             <div className="text-[10px] font-bold text-orange-600 mt-1">
-                              Transit: {((Number(p.fraisDouane) || 0) + (Number(p.fraisEchange) || 0)).toLocaleString('fr-FR')} DZD
+                              Transit: {((Number(p.fraisDouane) || 0) + (p.incoterm === 'CPT' ? 0 : Number(p.fraisEchange) || 0) + (Number(p.fraisMagasinage) || 0)).toLocaleString('fr-FR')} DZD
                             </div>
                           )}
                         </>
@@ -431,6 +433,7 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
         name: it.name || it.description || it.nom || it.article || 'Article',
         quantity: Number(it.quantity || it.quantite || it.qte || it.qty) || 1,
         unitPrice: Number(it.unitPrice || it.price || it.prix || it.pu) || 0,
+        grossWeight: Number(it.grossWeight || it.poidsBrut || it.poids || it.weight || it.gw) || null,
       }));
 
       const currentItems = purchase.items || [];
@@ -701,7 +704,7 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-inner space-y-4">
               <h4 className="font-bold text-xs uppercase text-slate-500 mb-2">Finance & Articles</h4>
               
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                  <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Devise</label>
                     <select 
@@ -724,6 +727,17 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                       disabled={isReadOnly}
                       placeholder="0.00"
                       className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono disabled:opacity-75 text-amber-600 font-bold"
+                    />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Taux Change en DZD</label>
+                    <input 
+                      type="number"
+                      value={purchase.tauxEchange || ''} 
+                      onChange={e => onUpdate({ tauxEchange: e.target.value ? Number(e.target.value) : null })}
+                      disabled={isReadOnly}
+                      placeholder="Ex: 147.50"
+                      className="w-full bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg text-sm font-mono disabled:opacity-75 text-emerald-800 font-bold focus:border-emerald-400 outline-none"
                     />
                  </div>
               </div>
@@ -760,11 +774,24 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                   <div className="space-y-2">
                     {(purchase.items || []).map((item: any, idx: number) => {
                       const calculatedTotalFOB = (purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0);
+                      const totalGrossWeight = (purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.grossWeight) || 0), 0);
                       const freight = Number(purchase.freightAmount) || 0;
-                      // Unit CFR = Unit FOB * (1 + Total Freight / Total FOB)
-                      const unitCfr = calculatedTotalFOB > 0 
-                        ? Number(item.unitPrice) * (1 + (freight / calculatedTotalFOB)) 
-                        : Number(item.unitPrice);
+                      
+                      // Identify weight ratio or fallback to value ratio if weights aren't set
+                      const weightRatio = totalGrossWeight > 0 
+                        ? ((Number(item.grossWeight) || 0) / totalGrossWeight)
+                        : calculatedTotalFOB > 0
+                          ? ((Number(item.quantity) * Number(item.unitPrice)) / calculatedTotalFOB)
+                          : 0;
+                      
+                      const itemTotalFreight = freight * weightRatio;
+                      const itemQty = Number(item.quantity) || 1;
+                      const unitCfr = Number(item.unitPrice) + (itemTotalFreight / itemQty);
+                      
+                      const tauxEchange = Number(purchase.tauxEchange) || 0;
+                      const totalTransitDZD = (Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0);
+                      const itemTotalTransitDZD = totalTransitDZD * weightRatio;
+                      const unitRevientDZD = tauxEchange > 0 ? (unitCfr * tauxEchange) + (itemTotalTransitDZD / itemQty) : 0;
                         
                       return (
                         <div key={item.id || idx} className="bg-white p-3 rounded-lg border border-slate-200 relative">
@@ -780,7 +807,7 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                             </button>
                           )}
                           <div className="grid grid-cols-12 gap-3 mb-2">
-                            <div className="col-span-12 sm:col-span-6">
+                            <div className="col-span-12 sm:col-span-4">
                               <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Nom de l'article</label>
                               <input 
                                 type="text"
@@ -795,7 +822,7 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                                 placeholder="Description..."
                               />
                             </div>
-                            <div className="col-span-6 sm:col-span-3">
+                            <div className="col-span-4 sm:col-span-2">
                               <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Qté</label>
                               <input 
                                 type="number"
@@ -809,7 +836,7 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                                 className="w-full bg-slate-50 border border-slate-200 px-2 py-1.5 rounded text-xs font-mono disabled:opacity-75 focus:bg-white"
                               />
                             </div>
-                            <div className="col-span-6 sm:col-span-3">
+                            <div className="col-span-4 sm:col-span-3">
                               <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">P.U FOB</label>
                               <input 
                                 type="number"
@@ -823,11 +850,39 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                                 className="w-full bg-slate-50 border border-slate-200 px-2 py-1.5 rounded text-xs font-mono disabled:opacity-75 focus:bg-white"
                               />
                             </div>
+                            <div className="col-span-4 sm:col-span-3">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Poids Brut (kg)</label>
+                              <input 
+                                type="number"
+                                value={item.grossWeight || ''} 
+                                onChange={e => {
+                                  const newItems = [...purchase.items];
+                                  newItems[idx].grossWeight = Number(e.target.value);
+                                  onUpdate({ items: newItems });
+                                }}
+                                disabled={isReadOnly}
+                                className="w-full bg-orange-50/50 border border-orange-200 px-2 py-1.5 rounded text-xs font-mono text-orange-800 disabled:opacity-75 focus:bg-white focus:border-orange-400 outline-none"
+                                placeholder="0.00"
+                              />
+                            </div>
                           </div>
                           
-                          <div className="flex justify-between items-center pt-2 border-t border-slate-100 px-1">
-                             <span className="text-[10px] uppercase font-bold text-slate-400">Prix unitaire CFR:</span>
-                             <span className="text-xs font-black text-[#136AA8]">{unitCfr.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {purchase.currency || 'EUR'}</span>
+                          <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 px-1">
+                             <div className="flex justify-between items-center">
+                               <span className="text-[10px] uppercase font-bold text-slate-400">Prix unitaire {purchase.incoterm === 'CPT' ? 'CPT' : 'CFR'}:</span>
+                               <div className="flex items-center gap-3">
+                                 {itemTotalFreight > 0 && (
+                                   <span className="text-[10px] text-slate-400 font-mono">(Fret: {itemTotalFreight.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {purchase.currency || 'EUR'})</span>
+                                 )}
+                                 <span className="text-xs font-black text-[#136AA8]">{unitCfr.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {purchase.currency || 'EUR'}</span>
+                               </div>
+                             </div>
+                             {tauxEchange > 0 && (
+                               <div className="flex justify-between items-center py-1.5 px-2 bg-emerald-50/50 rounded border border-emerald-100">
+                                 <span className="text-[10px] uppercase font-black text-emerald-600/70">Coût de Revient Unitaire:</span>
+                                 <span className="text-xs font-black text-emerald-700">{unitRevientDZD.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DZD</span>
+                               </div>
+                             )}
                           </div>
                         </div>
                       )
@@ -845,37 +900,85 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                      </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-slate-500 font-bold">Total Poids Brut</span>
+                     <span className="font-bold text-slate-700">
+                       {(purchase.items.reduce((acc: number, it: any) => acc + (Number(it.grossWeight) || 0), 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} kg
+                     </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
                      <span className="text-slate-500 font-bold">Fret Total</span>
                      <span className="font-bold text-amber-600">
                        {(Number(purchase.freightAmount) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}
                      </span>
                   </div>
                   <div className="flex justify-between items-center text-sm pt-1 border-t border-slate-100">
-                     <span className="text-slate-800 font-black">Total CFR</span>
+                     <span className="text-slate-800 font-black">Total {purchase.incoterm === 'CPT' ? 'CPT' : 'CFR'}</span>
                      <span className="font-black text-[#136AA8]">
                        {(purchase.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(purchase.freightAmount) || 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}
                      </span>
                   </div>
 
-                  {((purchase.fraisDouane || 0) > 0 || (purchase.fraisEchange || 0) > 0) && (
+                  {((purchase.fraisDouane || 0) > 0 || (purchase.incoterm !== 'CPT' && (purchase.fraisEchange || 0) > 0) || (purchase.fraisMagasinage || 0) > 0) && (
                     <div className="mt-3 pt-3 border-t border-dashed border-slate-200 space-y-1">
-                      <div className="flex justify-between items-center text-xs">
-                         <span className="text-slate-500">Droits & Taxes Douane:</span>
-                         <span className="font-bold text-orange-600">
-                           {(Number(purchase.fraisDouane) || 0).toLocaleString('fr-FR')} DZD
-                         </span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                         <span className="text-slate-500">Frais d'Échange (Port/Conteneur):</span>
-                         <span className="font-bold text-orange-600">
-                           {(Number(purchase.fraisEchange) || 0).toLocaleString('fr-FR')} DZD
-                         </span>
-                      </div>
+                      {(purchase.fraisDouane || 0) > 0 && (
+                        <div className="flex justify-between items-center text-xs">
+                           <span className="text-slate-500">Droits & Taxes Douane:</span>
+                           <span className="font-bold text-orange-600">
+                             {(Number(purchase.fraisDouane) || 0).toLocaleString('fr-FR')} DZD
+                           </span>
+                        </div>
+                      )}
+                      {purchase.incoterm !== 'CPT' && (purchase.fraisEchange || 0) > 0 && (
+                        <div className="flex justify-between items-center text-xs">
+                           <span className="text-slate-500">Frais d'Échange:</span>
+                           <span className="font-bold text-orange-600">
+                             {(Number(purchase.fraisEchange) || 0).toLocaleString('fr-FR')} DZD
+                           </span>
+                        </div>
+                      )}
+                      {(purchase.fraisMagasinage || 0) > 0 && (
+                        <div className="flex justify-between items-center text-xs">
+                           <span className="text-slate-500">Frais de Magasinage:</span>
+                           <span className="font-bold text-orange-600">
+                             {(Number(purchase.fraisMagasinage) || 0).toLocaleString('fr-FR')} DZD
+                           </span>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center text-xs font-black text-orange-850 pt-1 border-t border-orange-100/50">
                          <span>Sous-total Transit (DZD):</span>
                          <span>
-                           {((Number(purchase.fraisDouane) || 0) + (Number(purchase.fraisEchange) || 0)).toLocaleString('fr-FR')} DZD
+                           {((Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0)).toLocaleString('fr-FR')} DZD
                          </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {(purchase.tauxEchange || 0) > 0 && (
+                    <div className="mt-4 bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                      <h4 className="text-xs font-black uppercase text-emerald-800 tracking-widest mb-3 flex items-center gap-2">
+                        <FileText size={14} /> Fiche de Revient (DZD)
+                      </h4>
+                      <div className="space-y-1.5 text-xs text-emerald-700">
+                        <div className="flex justify-between">
+                          <span>Total Marchandise + Fret (Devise):</span>
+                          <span className="font-mono">{(purchase.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(purchase.freightAmount) || 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {purchase.currency || 'EUR'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Taux de change appliqué:</span>
+                          <span className="font-mono">{purchase.tauxEchange} DZD</span>
+                        </div>
+                        <div className="flex justify-between font-bold">
+                          <span>Valeur Convertie:</span>
+                          <span className="font-mono">{((purchase.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(purchase.freightAmount) || 0)) * purchase.tauxEchange).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} DZD</span>
+                        </div>
+                        <div className="flex justify-between border-b border-emerald-200/50 pb-2">
+                          <span>Sous-total Transit & Douane:</span>
+                          <span className="font-mono">{((Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0)).toLocaleString('fr-FR')} DZD</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 font-black text-emerald-900 text-sm">
+                          <span>Coût de Revient Total:</span>
+                          <span className="font-mono">{(((purchase.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0) + (Number(purchase.freightAmount) || 0)) * purchase.tauxEchange) + ((Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0))).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} DZD</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1072,12 +1175,25 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                   className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
                 />
               </div>
+              {purchase.incoterm !== 'CPT' && (
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-orange-600/70 mb-1 block">Frais d'Échange / Services Portuaires (DZD)</label>
+                  <input 
+                    type="number"
+                    value={purchase.fraisEchange || ''} 
+                    onChange={e => onUpdate({ fraisEchange: e.target.value ? Number(e.target.value) : null })}
+                    disabled={isReadOnly}
+                    placeholder="0.00"
+                    className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              )}
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-orange-600/70 mb-1 block">Frais d'Échange / Services Portuaires (DZD)</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-orange-600/70 mb-1 block">Frais de Magasinage (DZD)</label>
                 <input 
                   type="number"
-                  value={purchase.fraisEchange || ''} 
-                  onChange={e => onUpdate({ fraisEchange: e.target.value ? Number(e.target.value) : null })}
+                  value={purchase.fraisMagasinage || ''} 
+                  onChange={e => onUpdate({ fraisMagasinage: e.target.value ? Number(e.target.value) : null })}
                   disabled={isReadOnly}
                   placeholder="0.00"
                   className="w-full bg-white border border-orange-200 px-3 py-2 rounded-lg text-sm font-mono focus:bg-orange-50 focus:border-orange-300 outline-none disabled:opacity-75 disabled:bg-orange-50 disabled:cursor-not-allowed"
@@ -1085,11 +1201,11 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
               </div>
             </div>
 
-            {((purchase.fraisDouane || 0) > 0 || (purchase.fraisEchange || 0) > 0) && (
+            {((purchase.fraisDouane || 0) > 0 || (purchase.incoterm !== 'CPT' && (purchase.fraisEchange || 0) > 0) || (purchase.fraisMagasinage || 0) > 0) && (
               <div className="mt-4 bg-[#FFFAEB]/80 border border-amber-200/50 p-3 rounded-xl flex justify-between items-center text-xs font-black text-amber-900 tracking-wide">
-                <span className="uppercase">Total Dédouanement + Échange :</span>
+                <span className="uppercase">Total Dédouanement :</span>
                 <span className="font-mono text-base font-black text-orange-700">
-                  {((Number(purchase.fraisDouane) || 0) + (Number(purchase.fraisEchange) || 0)).toLocaleString('fr-FR')} DZD
+                  {((Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0)).toLocaleString('fr-FR')} DZD
                 </span>
               </div>
             )}
@@ -1112,17 +1228,51 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
           <div>
             <h3 className="font-black text-xs text-slate-400 uppercase tracking-widest mb-3">Articles de la DA</h3>
             <div className="space-y-3">
-              {purchase.items.map((item: any, i: number) => (
-                <div key={i} className="flex justify-between items-center bg-white p-3 border border-slate-100 rounded-xl">
-                  <div>
-                    <div className="font-bold text-sm text-slate-800">{item.name}</div>
-                    <div className="text-[10px] text-slate-400 uppercase tracking-widest">{item.category || 'N/A'}</div>
+              {purchase.items.map((item: any, i: number) => {
+                const calculatedTotalFOB = (purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.quantity) * Number(it.unitPrice)), 0);
+                const totalGrossWeight = (purchase.items || []).reduce((acc: number, it: any) => acc + (Number(it.grossWeight) || 0), 0);
+                const freight = Number(purchase.freightAmount) || 0;
+                
+                const weightRatio = totalGrossWeight > 0 
+                  ? ((Number(item.grossWeight) || 0) / totalGrossWeight)
+                  : calculatedTotalFOB > 0
+                    ? ((Number(item.quantity) * Number(item.unitPrice)) / calculatedTotalFOB)
+                    : 0;
+                
+                const itemTotalFreight = freight * weightRatio;
+                const itemQty = Number(item.quantity) || 1;
+                const unitCfr = Number(item.unitPrice) + (itemTotalFreight / itemQty);
+                
+                const tauxEchange = Number(purchase.tauxEchange) || 0;
+                const totalTransitDZD = (Number(purchase.fraisDouane) || 0) + (purchase.incoterm === 'CPT' ? 0 : Number(purchase.fraisEchange) || 0) + (Number(purchase.fraisMagasinage) || 0);
+                const itemTotalTransitDZD = totalTransitDZD * weightRatio;
+                const unitRevientDZD = tauxEchange > 0 ? (unitCfr * tauxEchange) + (itemTotalTransitDZD / itemQty) : 0;
+                
+                return (
+                  <div key={i} className="flex justify-between items-center bg-white p-3 border border-slate-100 rounded-xl">
+                    <div>
+                      <div className="font-bold text-sm text-slate-800">{item.name}</div>
+                      <div className="text-[10px] text-slate-400 uppercase tracking-widest">{item.category || 'N/A'}</div>
+                      <div className="flex gap-3 text-[10px] font-mono mt-1">
+                        {item.grossWeight > 0 && <span className="text-orange-600 font-bold">Poids: {item.grossWeight} kg</span>}
+                        <span className="text-[#136AA8]">FOB: {Number(item.unitPrice).toLocaleString('fr-FR')} {purchase.currency}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono font-bold text-xs text-slate-500 mb-0.5">{item.quantity} {item.unit || 'pcs'}</div>
+                      {tauxEchange > 0 ? (
+                        <div className="font-mono font-black text-sm text-emerald-700">
+                          {unitRevientDZD.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DZD
+                        </div>
+                      ) : (
+                        <div className="font-mono font-black text-sm text-[#136AA8]">
+                          {unitCfr.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {purchase.currency}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-mono font-bold text-sm text-[#136AA8]">{item.quantity} {item.unit || 'pcs'}</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1177,8 +1327,8 @@ function PurchaseDetails({ purchase, onUpdate, onConfirm, onUnconfirm, role, cur
                    Collez votre tableau JSON ci-dessous. Le format attendu : <br />
                    <code className="block mt-1 font-mono text-[10px] text-slate-600">
                      [<br/>
-                       &nbsp;&nbsp;&#123; "name": "Pièce Rechange 1", "quantity": 10, "unitPrice": 45.5 &#125;,<br/>
-                       &nbsp;&nbsp;&#123; "name": "Pièce Rechange 2", "quantity": 2, "unitPrice": 120.0 &#125;<br/>
+                       &nbsp;&nbsp;&#123; "name": "Pièce Rechange 1", "quantity": 10, "unitPrice": 45.5, "grossWeight": 15.2 &#125;,<br/>
+                       &nbsp;&nbsp;&#123; "name": "Pièce Rechange 2", "quantity": 2, "unitPrice": 120.0, "grossWeight": 4.5 &#125;<br/>
                      ]
                    </code>
                  </div>

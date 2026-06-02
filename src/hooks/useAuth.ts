@@ -15,9 +15,24 @@ export function useAuth() {
       if (firebaseUser) {
         setUser(firebaseUser);
         try {
-          // Fetch or create user Profile
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
+          // Fetch or create user Profile with retry
+          let userDoc = null;
+          let retries = 3;
+          while (retries > 0) {
+            try {
+              userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+              break;
+            } catch (err: any) {
+              if (err.message && err.message.includes('offline') && retries > 1) {
+                retries--;
+                await new Promise(r => setTimeout(r, 1000));
+              } else {
+                throw err;
+              }
+            }
+          }
+          
+          if (userDoc && userDoc.exists()) {
             let currentRole = userDoc.data().role;
             let currentTenantId = userDoc.data().tenantId;
             let currentUnitId = userDoc.data().unitId || null;
