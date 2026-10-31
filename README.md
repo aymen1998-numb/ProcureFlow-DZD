@@ -1,67 +1,57 @@
-# Purchase Order Management System
+# ProcureFlow-DZD
 
-A comprehensive web application for managing Purchase Orders (POs), deliveries, and invoicing.
+Web application for managing local purchasing (DZD), international import files (EUR / USD), stock movements, and supplier communications across warehouse units.
 
 ## Features
-- Create and manage purchase orders
-- Track delivery statuses and record packing slips (BL)
-- Generate and record final invoices (FF)
-- PDF generation for orders, deliveries, and invoices
-- Interactive dashboards and status tracking
-- Role-based Google Auth Authentication
 
-## Prerequisites
-- Node.js (v18 or higher recommended)
-- A Firebase Project (for Authentication and Database)
+- **Purchase Requests & Local Orders (DA / BC)**: Track internal purchase requests from warehouse/production units and convert them into local purchase orders in DZD.
+- **International Purchases (Import Dossiers)**: Follow import files, landed cost estimates, customs D10 archives, financing structures (cash, leasing, or 20/80 bank financing), and document checklists (Commercial Invoice, Bill of Lading, Certificate of Origin, Packing List).
+- **Bank Payment Files (DHL Tracking)**: Track DHL waybill numbers used for sending payment dossiers and original trade documents to the bank, with automatic detection from incoming supplier/bank emails and 3-day inactivity reminders.
+- **Inventory & Production**: Manage finished goods, raw materials, bills of materials (BOM), production orders, and inter-unit stock transfers.
+- **Roles & Permissions**: Multi-unit access for buyers, international buyers, warehouse keepers (`magasinier`), finance, and admins.
 
-## Setup Instructions
+## Tech Stack
 
-1. **Install Dependencies**
-   Run the following command to install the necessary packages:
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS
+- **Backend / Database**: Firebase Authentication & Cloud Firestore (with local IndexedDB offline persistence)
+- **Exports**: PDF (`jspdf`, `jspdf-autotable`) and Excel (`xlsx`)
+- **Email Sync**: Gmail REST API (OAuth2), local `.eml`/`.mbox` file reader, and an optional Python IMAP script (`scripts/local_email_sync.py`)
+
+## Getting Started
+
+1. Clone the repository and install dependencies:
    ```bash
+   git clone https://github.com/aymen1998-numb/ProcureFlow-DZD.git
+   cd ProcureFlow-DZD
    npm install
    ```
 
-2. **Firebase Configuration**
-   - Head to the [Firebase Console](https://console.firebase.google.com/) and create a new project.
-   - Enable **Firestore Database** and **Authentication** (Google Sign-In).
-   - Register a Web App in your Firebase project to get your configuration.
-   - Open the `firebase-applet-config.json` file in the root of the project and replace its contents with your own Firebase configuration keys:
-   ```json
-   {
-     "projectId": "YOUR_PROJECT_ID",
-     "appId": "YOUR_APP_ID",
-     "apiKey": "YOUR_API_KEY",
-     "authDomain": "YOUR_PROJECT_ID.firebaseapp.com",
-     "firestoreDatabaseId": "(default)",
-     "storageBucket": "YOUR_PROJECT_ID.firebasestorage.app",
-     "messagingSenderId": "YOUR_SENDER_ID",
-     "measurementId": "YOUR_MEASUREMENT_ID"
-   }
-   ```
-
-3. **Deploy Firestore Security Rules**
-   You can deploy the included `firestore.rules` to your Firebase project to secure your database:
+2. Configure environment variables:
    ```bash
-   npm install -g firebase-tools
-   firebase login
-   firebase init firestore # Select your newly created project
-   firebase deploy --only firestore:rules
+   cp .env.example .env
+   ```
+   Update `.env` or `firebase-applet-config.json` with your Firebase project config.
+
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+   The app runs at `http://localhost:3000`.
+
+4. Build for production:
+   ```bash
+   npm run build
    ```
 
-## Running the Application
+## Updating `aymen1998-numb/ProcureFlow-DZD` on GitHub
 
-Start the local development server:
+Run `./push-to-github.sh` (macOS / Linux / Git Bash) or `push-to-github.bat` (Windows), or run:
+
 ```bash
-npm run dev
+git init -b main
+git add .
+git commit -m "Update ProcureFlow-DZD"
+git remote remove origin 2>/dev/null || true
+git remote add origin https://github.com/aymen1998-numb/ProcureFlow-DZD.git
+git push -u --force origin main
 ```
-
-The application will be accessible at `http://localhost:3000`.
-
-## Building for Production
-
-To build the application for deployment (e.g., to Vercel, Netlify, or Firebase Hosting), run:
-```bash
-npm run build
-```
-This will generate optimized static files in the `dist` directory.
