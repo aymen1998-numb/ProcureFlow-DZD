@@ -1,0 +1,178 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "buyer", "finance", "buyer_intl", "magasinier", "magasinier_central"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Vendor information",
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["local", "foreign"] },
+        "userId": { "type": "string" },
+        "nif": { "type": "string" },
+        "rc": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "bankInfo": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Product catalog item",
+      "type": "object",
+      "properties": {
+        "sku": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "defaultPrice": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "sku"]
+    },
+    "PurchaseOrder": {
+      "title": "Purchase Order",
+      "description": "Formal order document",
+      "type": "object",
+      "properties": {
+        "poNumber": { "type": "string" },
+        "userId": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "sent", "confirmed", "partially_delivered", "delivered", "closed"] },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "currency": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["poNumber", "supplierId", "status", "totalAmount"]
+    },
+    "DeliveryNote": {
+      "title": "Delivery Note",
+      "description": "Bon de Livraison records",
+      "type": "object",
+      "properties": {
+        "dnNumber": { "type": "string" },
+        "poId": { "type": "string" },
+        "date": { "type": "string" },
+        "items": { "type": "array" },
+        "receivedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["dnNumber", "poId", "date", "items"]
+    },
+    "StatusHistory": {
+      "title": "Status History",
+      "description": "Audit trail for status changes",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string" },
+        "userName": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["status", "userId", "createdAt"]
+    },
+    "Transfer": {
+      "title": "Transfer",
+      "description": "Inventory transfer between locations",
+      "type": "object",
+      "properties": {
+        "transferNumber": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "sourceLocation": { "type": "string" },
+        "destLocation": { "type": "string" },
+        "status": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "items": { "type": "array" }
+      },
+      "required": ["transferNumber", "tenantId", "sourceLocation", "destLocation", "status"]
+    },
+    "Export": {
+      "title": "Export",
+      "description": "Exports invoices and proformas",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["proforma", "final"] },
+        "clientName": { "type": "string" },
+        "clientAddress": { "type": "string" },
+        "clientMobile": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "portOfLoading": { "type": "string" },
+        "portOfDischarge": { "type": "string" },
+        "currency": { "type": "string" },
+        "freightAmount": { "type": "number" },
+        "paymentMode": { "type": "string" },
+        "remark": { "type": "string" },
+        "numberOfPackages": { "type": "number" },
+        "totalFob": { "type": "number" },
+        "totalCfr": { "type": "number" },
+        "items": { "type": "array" },
+        "clientBankName": { "type": "string" },
+        "clientBankAddress": { "type": "string" },
+        "clientBankAccount": { "type": "string" },
+        "clientBankSwift": { "type": "string" },
+        "clientBankIban": { "type": "string" }
+      },
+      "required": ["tenantId", "invoiceNumber"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/exports/{exportId}": {
+      "schema": "Export",
+      "description": "Exports invoices and proformas"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Vendor directory"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Items catalog"
+    },
+    "/purchase_orders/{poId}": {
+      "schema": "PurchaseOrder",
+      "description": "Orders"
+    },
+    "/purchase_orders/{poId}/deliveries/{dnId}": {
+      "schema": "DeliveryNote",
+      "description": "Logistics receipts"
+    },
+    "/purchase_orders/{poId}/status_history/{historyId}": {
+      "schema": "StatusHistory",
+      "description": "Audit trail entries"
+    },
+    "/transfers/{transferId}": {
+      "schema": "Transfer",
+      "description": "Inventory transfer orders"
+    }
+  }
+}

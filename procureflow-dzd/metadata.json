@@ -1,0 +1,6 @@
+{
+  "name": "Dashboard",
+  "description": "Professional purchasing management system for Algerian companies with DZD support, PO workflow, and Excel export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

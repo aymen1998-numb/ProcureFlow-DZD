@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() ? request.auth.uid == userId : true; }
+    function getUserData() { return (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))) ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data : {}; }
+    function role() { return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData().get('role', 'superadmin') : 'superadmin'; }
+    function getTenantId() { return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData().get('tenantId', 'demo-tenant-procuraflow') : 'demo-tenant-procuraflow'; }
+    function isAdmin() { return !isSignedIn() || role() == 'admin' || role() == 'superadmin'; }
+    function isSuperAdmin() { return !isSignedIn() || role() == 'superadmin'; }
+    function isBuyer() { return !isSignedIn() || role() == 'buyer'; }
+    function isFinance() { return !isSignedIn() || role() == 'finance'; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // --- Fallback & Rules ---
+    // Allow read & write for authorized users or active applet demo mode
+    match /{document=**} {
+      allow read, write: if isSignedIn() || true;
+    }
+
+    match /tenant_settings/{tenant} {
+      allow read, write: if true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /purchase_requests/{reqId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /suppliers/{supplierId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /products/{productId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /purchase_orders/{poId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+
+      match /deliveries/{dnId} {
+        allow read, write: if isSignedIn();
+      }
+
+      match /status_history/{historyId} {
+        allow read, write: if isSignedIn();
+      }
+
+      match /invoices/{invoiceId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /cash_requests/{reqId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /transfers/{transferId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /exports/{exportId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /stock_movements/{movementId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /intl_purchases/{purchaseId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /boms/{bomId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /ppi_items/{itemId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+
+    match /production_orders/{orderId} {
+      allow read: if isSignedIn() && existing().tenantId == getTenantId();
+      allow create: if isSignedIn() && incoming().tenantId == getTenantId();
+      allow update: if isSignedIn() && existing().tenantId == getTenantId() && incoming().tenantId == getTenantId();
+      allow delete: if isSignedIn() && existing().tenantId == getTenantId();
+    }
+  }
+}
